@@ -92,7 +92,7 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
         subscriptionId: undefined
     });
 
-    let test = 1;
+    const monitoredItemId = React.useRef(1);
 
     /**
      * The effect to clean up the component when it is unmounted.
@@ -140,14 +140,12 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
                     if (item) {
                         console.log(ii.Value);
                         item.value = ii.Value;
-                        //m.current.monitoredItems = Array.from(monitoredItems.values());
                     }
                 });
             }
         });
-        console.log('Publish received');
-        console.log(counter);
-        setCounter(counter => counter + 1);
+        //setCounter(counter => counter + 1);
+        setVariables(variables => [...variables]);
     };
 
     // Unsubscribe when component is unmounted
@@ -184,7 +182,8 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
         
         setVariables(newVariables);
 
-        m.current.monitoredItems = items;
+        if (items.length > 0)
+            m.current.monitoredItems.push(items[items.length - 1]);
 
         if (newVariables.length == 1 && mySubscriptionContext.subscriptionID == -1 ) {
             if (typeof createSubscriptionAPI === "function") {
@@ -201,17 +200,16 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
                 didRequestSubscription.current = true;
             }
         }
-
         if (m.current.monitoredItems.length > 1) {
             console.log('Add Monitored Item');
-            const lastItem = m.current.monitoredItems[m.current.monitoredItems.length - 1];
-            const singleItemArray = lastItem ? [lastItem] : [];
+            //const lastItem = m.current.monitoredItems[m.current.monitoredItems.length - 1];
+            //const singleItemArray = lastItem ? [lastItem] : [];
             if (typeof m.current.subscriptionId === 'number') {
                 //addMonitoredItemAPI(addNewMonitoredItem, singleItemArray, mySubscriptionContext);
                 addMonitoredItemAPI(addNewMonitoredItem, m.current.monitoredItems, mySubscriptionContext);
-                mySubscriptionContext.publishCtx = newVariables
-                lastItem.monitoredItemId = test;
-                test++;
+                mySubscriptionContext.publishCtx = variables;
+                m.current.monitoredItems[m.current.monitoredItems.length - 1].monitoredItemId = monitoredItemId.current;
+                monitoredItemId.current++;
             }
         }
         
@@ -240,12 +238,15 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
         variables.splice(index, 1);
         setVariables(variables);
         setItems(accessViewItems);
+        m.current.monitoredItems.splice(index, 1);
 
         if (variables.length == 0) {
             setIsSubscriptionEnabled(false);
             if (typeof subscriptionId === "number" && typeof deleteSubscription === "function") {
                 deleteSubscriptionAPI(deleteSubscription, mySubscriptionContext);
                 mySubscriptionContext.subscriptionID = -1;
+                monitoredItemId.current = 1;
+                didRequestSubscription.current = false;
                 //deleteSubscription(subscriptionId);
             }
         }
@@ -384,8 +385,8 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
             m.current.subscriptionId = subscriptionId;
             mySubscriptionContext.subscriptionID = subscriptionId;
             addMonitoredItemAPI(addNewMonitoredItem, m.current.monitoredItems, mySubscriptionContext);
-            m.current.monitoredItems[0].monitoredItemId = test;
-            test++;
+            m.current.monitoredItems[0].monitoredItemId = monitoredItemId.current;
+            monitoredItemId.current++;
             didRequestSubscription.current = false; // Reset the flag
         }
     }, [subscriptionId]);
@@ -413,7 +414,7 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
             console.error("readValues[" + nodesToRead.length + "]: " + m.current.internalHandle);
             readValues(m.current.internalHandle, nodesToRead);
         }
-
+      
         // Perform any additional logic here
         previousLength.current = variables.length;
     }, [variables, createSubscription]);
