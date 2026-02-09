@@ -20,6 +20,8 @@ import { IReadValueId } from '../service/IReadValueId';
 
 import { BrowseContext } from '../BrowseContext';
 
+import { createSubscriptionAPI, subscriptionContext, addMonitoredItemAPI, deleteSubscriptionAPI, removeMonitoredItemsAPI, removeMonitoredItemAPI } from '../SubscriptionAPI';
+
 /**
  * A component that displays a list of variable values.
  * It subscribes to the variables and updates the values when they change.
@@ -29,7 +31,8 @@ interface VariableValueListInternals {
    monitoredItems: IMonitoredItem[],
    requests: number[],
    mounted: boolean,
-   cleanedUp: boolean
+   cleanedUp: boolean,
+    subscriptionId: number | undefined
 }
 
 interface VariableValueListProps {
@@ -41,6 +44,7 @@ interface VariableValueListProps {
 interface Row {
    name: string,
    item: IMonitoredItem
+   monitorID?: number
 }
 
 export interface AccessViewItem {
@@ -48,6 +52,14 @@ export interface AccessViewItem {
     nodeId: string;
     value?: OpcUa.DataValue;
 }
+
+export const mySubscriptionContext = {
+    subscriptionID: -1,
+    publishCB: null,
+    publishCtx: {} // or your context value
+};
+
+
 
 /**
  * 
@@ -76,8 +88,11 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
         monitoredItems: [],
         requests: [],
         mounted: true,
-        cleanedUp: false
+        cleanedUp: false,
+        subscriptionId: undefined
     });
+
+    let test = 1;
 
     /**
      * The effect to clean up the component when it is unmounted.
@@ -97,14 +112,14 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
       addNewMonitoredItem,
       removeMonitoredItems,
       removeMonitoredItem,
-      createSubscription,
       deleteSubscription,
+      createSubscription,
       subscriptionId,
       setIsSubscriptionEnabled,
       subscribe,
       unsubscribe,
       lastSequenceNumber
-   } = React.useContext(SubscriptionContext);
+    } = React.useContext(SubscriptionContext);
 
     const {
         browseChildren,
@@ -112,6 +127,28 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
         responseCount,
         processResults
     } = React.useContext(BrowseContext);
+
+    const handlePublish = (
+        data: any,
+        monitoredItems: Map<number, IMonitoredItem>) => {
+        
+        data.NotificationMessage?.NotificationData.forEach((eo) => {
+            if (eo.UaTypeId === OpcUa.DataTypeIds.DataChangeNotification) {
+                const dcn = eo as OpcUa.DataChangeNotification;
+                dcn.MonitoredItems?.forEach((ii) => {
+                    const item = monitoredItems.get(ii.ClientHandle ?? 0);
+                    if (item) {
+                        console.log(ii.Value);
+                        item.value = ii.Value;
+                        //m.current.monitoredItems = Array.from(monitoredItems.values());
+                    }
+                });
+            }
+        });
+        console.log('Publish received');
+        console.log(counter);
+        setCounter(counter => counter + 1);
+    };
 
     // Unsubscribe when component is unmounted
     React.useEffect(() => {
@@ -138,32 +175,67 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
         accessViewItems.forEach((x) => {
             items.push({
                 nodeId: x.nodeId,
-                subscriberHandle: HandleFactory.increment()
+                subscriberHandle: HandleFactory.increment(),
             });
             if (x?.displayName) {
                 newVariables.push({ name: x?.displayName, item: items[items.length - 1] });
             }
         });
+        
         setVariables(newVariables);
 
         m.current.monitoredItems = items;
+
+        if (newVariables.length == 1 && mySubscriptionContext.subscriptionID == -1 ) {
+            if (typeof createSubscriptionAPI === "function") {
+
+                mySubscriptionContext.publishCB = handlePublish;
+                mySubscriptionContext.publishCtx = newVariables; // or your context value
+                const result = createSubscriptionAPI(createSubscription, mySubscriptionContext);
+
+                if (result !== -2) {
+                    console.log('Subscription created with ID:', result);
+                } else {
+                    console.error('Failed to create subscription: No available subscription slots.');
+                }   
+                didRequestSubscription.current = true;
+            }
+        }
+
+        if (m.current.monitoredItems.length > 1) {
+            console.log('Add Monitored Item');
+            const lastItem = m.current.monitoredItems[m.current.monitoredItems.length - 1];
+            const singleItemArray = lastItem ? [lastItem] : [];
+            if (typeof m.current.subscriptionId === 'number') {
+                //addMonitoredItemAPI(addNewMonitoredItem, singleItemArray, mySubscriptionContext);
+                addMonitoredItemAPI(addNewMonitoredItem, m.current.monitoredItems, mySubscriptionContext);
+                mySubscriptionContext.publishCtx = newVariables
+                lastItem.monitoredItemId = test;
+                test++;
+            }
+        }
         
     }, [accessViewItems]);
+
 
     // Effect to add monitored items only after subscription is open
     React.useEffect(() => {
         if (subscriptionState === SubscriptionState.Open && m.current.monitoredItems.length > 0) {
-            addNewMonitoredItem(m.current.monitoredItems, m.current.internalHandle);
+            if (typeof m.current.subscriptionId === 'number') {
+                //addNewMonitoredItem(m.current.monitoredItems, m.current.internalHandle, m.current.subscriptionId);
+                addMonitoredItemAPI(addNewMonitoredItem, m.current.monitoredItems, mySubscriptionContext);
+            }
         }
-        setCounter(counter => counter + 1);
+        //setCounter(counter => counter + 1);
     }, [subscriptionState, addNewMonitoredItem]);
+    
 
     /**
      * Deletes an item from the list and unsubscribes it.
      * @param index - The index of the item to delete.
      */
     const onDeleteItem = (index: number) => {
-        removeMonitoredItem(m.current.monitoredItems, index, m.current.internalHandle);
+        removeMonitoredItemAPI(removeMonitoredItem, m.current.monitoredItems, index, mySubscriptionContext);
         accessViewItems.splice(index, 1);
         variables.splice(index, 1);
         setVariables(variables);
@@ -172,7 +244,9 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
         if (variables.length == 0) {
             setIsSubscriptionEnabled(false);
             if (typeof subscriptionId === "number" && typeof deleteSubscription === "function") {
-                deleteSubscription(subscriptionId);
+                deleteSubscriptionAPI(deleteSubscription, mySubscriptionContext);
+                mySubscriptionContext.subscriptionID = -1;
+                //deleteSubscription(subscriptionId);
             }
         }
     };
@@ -184,7 +258,7 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
         const state = m.current;
         return () => {
             if (!state.mounted && !state.cleanedUp && state.monitoredItems.length) {
-                removeMonitoredItems(state.monitoredItems, state.internalHandle);
+                removeMonitoredItemsAPI(removeMonitoredItems, state.monitoredItems, mySubscriptionContext);
                 state.cleanedUp = true;
             }
         };
@@ -194,9 +268,11 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
      * Effect to trigger render when a publish response is received.
      * It updates the counter and sets the items.
      */
+    /*
     React.useEffect(() => {
         setCounter(counter => counter + 1);
     }, [lastSequenceNumber]);
+    */
 
     // Browse the root node when it changes and subscribe to the variables
     React.useEffect(() => {
@@ -270,7 +346,9 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
                     });
                     m.current.monitoredItems = items;
                     if (subscriptionState === SubscriptionState.Open) {
-                        subscribe(items, m.current.internalHandle);
+                        if (typeof m.current.subscriptionId === 'number') {
+                            subscribe(items, m.current.internalHandle, m.current.subscriptionId);
+                        }
                     }
                     setVariables(newVariables);
                 }
@@ -298,13 +376,23 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
     };
     */
 
+    const didRequestSubscription = React.useRef(false);
+
+    React.useEffect(() => {
+        if (didRequestSubscription.current && subscriptionId) {
+            console.log('Add Monitored Item');
+            m.current.subscriptionId = subscriptionId;
+            mySubscriptionContext.subscriptionID = subscriptionId;
+            addMonitoredItemAPI(addNewMonitoredItem, m.current.monitoredItems, mySubscriptionContext);
+            m.current.monitoredItems[0].monitoredItemId = test;
+            test++;
+            didRequestSubscription.current = false; // Reset the flag
+        }
+    }, [subscriptionId]);
+
     // Effect to detect when a new element is added to the variables array
     React.useEffect(() => {
-        if (variables.length == 1) {
-            if (typeof createSubscription === "function") {
-                createSubscription();
-            }
-        }
+
         //console.log('A new element was added to the variables array.');
 
         // Read values for new variables

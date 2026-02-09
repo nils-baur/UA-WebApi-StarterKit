@@ -6,14 +6,15 @@ import { SubscriptionState } from '../service/SubscriptionState';
 import { SessionState } from '../service/SessionState';
 import { SessionContext } from '../SessionContext';
 import { SubscriptionContext } from '../SubscriptionContext';
+import { enablePublishingAPI } from '../SubscriptionAPI';
 
 export const SessionStatusBar = () => {
    const theme = useTheme();
 
    const {
       sessionState,
-      setIsEnabled,
-      setIsSessionEnabled
+       setIsEnabled,
+       setIsSessionEnabled
    } = React.useContext(SessionContext);
 
    const {
@@ -24,16 +25,14 @@ export const SessionStatusBar = () => {
 
     const handleConnect = React.useCallback((state: SessionState) => {
         if (state === SessionState.Disconnected || state === SessionState.NoSession) {
-            setIsSubscriptionEnabled(true);
             setIsSessionEnabled(true);
             setIsEnabled(true);
         }
         else if (state === SessionState.SessionActive || state == SessionState.Error) {
-            setIsSubscriptionEnabled(false);
             setIsSessionEnabled(false);
             setIsEnabled(false);
         }
-    }, [setIsEnabled, setIsSessionEnabled, setIsSubscriptionEnabled]);
+    }, [setIsEnabled, setIsSessionEnabled]);
 
    /***
     * Handle subscription state changes
@@ -43,19 +42,18 @@ export const SessionStatusBar = () => {
     */
     const handleSubscription = React.useCallback((subscriptionState: SubscriptionState) => {
         if (subscriptionState === SubscriptionState.Closed) {
-            setIsSubscriptionEnabled(true);
+            enablePublishingAPI(setIsSubscriptionEnabled, true);
+            //setIsSubscriptionEnabled(true);
         }
         else {
-            setIsSubscriptionEnabled(false);
+            //setIsSubscriptionEnabled(false);
+            enablePublishingAPI(setIsSubscriptionEnabled, false);
         }
     }, [setIsSubscriptionEnabled]);
 
    return (
       <Toolbar variant='dense' disableGutters sx={{ py: 0, minHeight: '36px', justifyContent: 'space-between' }}>
          <Box ml={6} sx={{ flexGrow: 0, display: { xs: 'none', color: theme.palette.text.primary, md: 'flex' } }}>
-               {/* <CustomButton sx={{ mr: 2 }} onClick={() => handleConnect(sessionState)}>
-                    {(sessionState === SessionState.Disconnected) ? <PlayArrowIcon /> : <StopIcon />}
-                </CustomButton> */}
             <Button sx={{ mr: 2 }} onClick={() => handleConnect(sessionState)} >
                    <Typography variant='body2' sx={{ pr: 4, color:'black'}}>Websocket:</Typography>
                    <Typography variant='body2' sx={{ color: 'black', fontWeight: 'bolder'}}>{SessionState[sessionState]}</Typography>

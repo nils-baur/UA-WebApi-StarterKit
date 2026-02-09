@@ -202,41 +202,46 @@ export const SessionProvider = ({ children }: SessionProps) => {
                 sendMessage(JSON.stringify(request));
             }
             else {
-                const callerHandle = requestHeader.RequestHandle;
-                console.error(`===>>> REQUEST: ${apiNames[request.ServiceId ?? ''].path} ${requestHeader.RequestHandle}`);
+                //if (request.ServiceId != "AASRequest") {
+                    const callerHandle = requestHeader.RequestHandle;
+                    console.error(`===>>> REQUEST: ${apiNames[request.ServiceId ?? ''].path} ${requestHeader.RequestHandle}`);
 
-            call(
-               `/opcua/${apiNames[request.ServiceId ?? ''].path}`,
-               { callerHandle: callerHandle, request: { Body: request.Body } },
-               undefined,
-               user,
-               true)
-               .then(response => {
-                  if (response.code) {
-                     processRawResponse({
-                        ServiceId: apiNames[request.ServiceId ?? ''].response,
-                        Body: {
-                           ResponseHeader: {
-                              RequestHandle: callerHandle,
-                              ServiceResult: response.code,
-                              ServiceDiagnostics: { LocalizedText: 0 }, 
-                              StringTable: [response.message]
-                           }
-                        }
-                     })
-                  }
-                  else {
-                     processRawResponse({
-                        ServiceId: apiNames[request.ServiceId ?? ''].response,
-                        Body: response
-                     })
-                  }
-               })
-               .catch(error => {
-                  console.error('Unexpected HTTP error:', error);
-                  m.current.requests.delete(callerHandle);
-               });
-         }
+                    call(
+                        `/opcua/${apiNames[request.ServiceId ?? ''].path}`,
+                        { callerHandle: callerHandle, request: { Body: request.Body } },
+                        undefined,
+                        user,
+                        true)
+                        .then(response => {
+                            if (response.code) {
+                                processRawResponse({
+                                    ServiceId: apiNames[request.ServiceId ?? ''].response,
+                                    Body: {
+                                        ResponseHeader: {
+                                            RequestHandle: callerHandle,
+                                            ServiceResult: response.code,
+                                            ServiceDiagnostics: { LocalizedText: 0 },
+                                            StringTable: [response.message]
+                                        }
+                                    }
+                                })
+                            }
+                            else {
+                                processRawResponse({
+                                    ServiceId: apiNames[request.ServiceId ?? ''].response,
+                                    Body: response
+                                })
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Unexpected HTTP error:', error);
+                            m.current.requests.delete(callerHandle);
+                        });
+                }
+                //else {
+                //    console.warn('AAS Call');
+                //}
+         //}
       } catch (error) {
          console.error('Failed to send request:', error);
       }
@@ -351,9 +356,10 @@ export const SessionProvider = ({ children }: SessionProps) => {
             case ReadyState.CLOSED:
                 if (m.current.sessionState === SessionState.SessionActive) {
                     deleteSession();
+                    
+                    m.current.sessionState = SessionState.Disconnected;
+                    setSessionState(m.current.sessionState);
                 }
-                m.current.sessionState = SessionState.Disconnected;
-                setSessionState(m.current.sessionState);
                 break;
             default:
                 break;
@@ -414,17 +420,22 @@ export const SessionProvider = ({ children }: SessionProps) => {
 
     const setIsSessionEnabledImpl = React.useCallback((value: boolean) => {
         console.log("Set session enabled: " + value);
+        //Needed?
         if (m.current.isSessionEnabled === value) {
             return;
         }
         m.current.isSessionEnabled = value;
         setIsSessionEnabled(m.current.isSessionEnabled);
-        if (value && m.current.sessionState === SessionState.NoSession) {
+        if (value && m.current.sessionState === SessionState.NoSession || m.current.sessionState === SessionState.Disconnected) {
             createSession();
+            m.current.sessionState = SessionState.Creating;
+            setSessionState(m.current.sessionState);
             return;
         }
         if (!value && m.current.sessionState === SessionState.SessionActive) {
             deleteSession();
+            m.current.sessionState = SessionState.Disconnected;
+            setSessionState(m.current.sessionState);
             return;
         }
     }, [createSession, deleteSession]);

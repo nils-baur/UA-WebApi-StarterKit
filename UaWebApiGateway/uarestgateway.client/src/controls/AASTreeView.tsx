@@ -8,6 +8,9 @@ import ContextMenu from "../ContextMenu";
 import { SessionContext } from "../SessionContext";
 import { sendAASRequest } from "../utils/SendAASRequest";
 
+//import { IMonitoredItem } from '../SubscriptionProvider';
+import { SubscriptionContext } from '../SubscriptionContext';
+
 interface TreeNode {
     id: string;
     name: string;
@@ -30,7 +33,21 @@ const AASTreeView: React.FC = () => {
 
     const session = useContext(SessionContext);
     const sessionRef = useRef(session);
-
+    
+    const {
+        subscriptionState,
+        addNewMonitoredItem,
+        removeMonitoredItems,
+        removeMonitoredItem,
+        createSubscription,
+        deleteSubscription,
+        subscriptionId,
+        setIsSubscriptionEnabled,
+        subscribe,
+        unsubscribe,
+        lastSequenceNumber
+    } = React.useContext(SubscriptionContext);
+    
     useEffect(() => {
         sessionRef.current = session;
     }, [session]);
@@ -149,6 +166,11 @@ const AASTreeView: React.FC = () => {
         const path = node.path!;
         const url = `/shells/${encodeId(node.parentAASId!)}/submodels/${encodeId(node.parentSubmodelId!)}/submodel-elements/${path}`;
 
+        
+        if (typeof createSubscription === "function") {
+            createSubscription();
+        }
+        
         const fetchAndUpdate = async () => {
             const value = await fetchValue(node);
             setAccessViewItems(prev =>
@@ -217,6 +239,10 @@ const AASTreeView: React.FC = () => {
             return prev.filter((_, i) => i !== index);
         });
         setAccessViewContextMenu(null);
+
+        if (typeof createSubscription === "function") {
+            deleteSubscription();
+        }
     };
 
     const renderValue = (val: any): string => {
