@@ -20,7 +20,7 @@ import { IReadValueId } from '../service/IReadValueId';
 
 import { BrowseContext } from '../BrowseContext';
 
-import { createSubscriptionAPI, subscriptionContext, addMonitoredItemAPI, deleteSubscriptionAPI, removeMonitoredItemsAPI, removeMonitoredItemAPI } from '../SubscriptionAPI';
+import { createSubscriptionAPI, addMonitoredItemAPI, deleteSubscriptionAPI, removeMonitoredItemsAPI, removeMonitoredItemAPI } from '../SubscriptionAPI';
 
 /**
  * A component that displays a list of variable values.
@@ -115,10 +115,7 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
       deleteSubscription,
       createSubscription,
       subscriptionId,
-      setIsSubscriptionEnabled,
-      subscribe,
-      unsubscribe,
-      lastSequenceNumber
+      //setIsSubscriptionEnabled
     } = React.useContext(SubscriptionContext);
 
     const {
@@ -144,20 +141,8 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
                 });
             }
         });
-        //setCounter(counter => counter + 1);
         setVariables(variables => [...variables]);
     };
-
-    // Unsubscribe when component is unmounted
-    React.useEffect(() => {
-        const state = m.current;
-        return () => {
-            if (!state.mounted && !state.cleanedUp && state.monitoredItems.length) {
-                unsubscribe(state.monitoredItems, state.internalHandle);
-                state.cleanedUp = true;
-            }
-        };
-    }, [unsubscribe]);
 
     /**
      * The effect to subscribe to the variables when the component is mounted.
@@ -201,12 +186,11 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
             }
         }
         if (m.current.monitoredItems.length > 1) {
-            console.log('Add Monitored Item');
-            //const lastItem = m.current.monitoredItems[m.current.monitoredItems.length - 1];
-            //const singleItemArray = lastItem ? [lastItem] : [];
             if (typeof m.current.subscriptionId === 'number') {
-                //addMonitoredItemAPI(addNewMonitoredItem, singleItemArray, mySubscriptionContext);
-                addMonitoredItemAPI(addNewMonitoredItem, m.current.monitoredItems, mySubscriptionContext);
+                const lastItem = m.current.monitoredItems[m.current.monitoredItems.length - 1];
+                const singleItemArray = lastItem ? [lastItem] : [];
+
+                addMonitoredItemAPI(addNewMonitoredItem, singleItemArray, mySubscriptionContext);
                 mySubscriptionContext.publishCtx = variables;
                 m.current.monitoredItems[m.current.monitoredItems.length - 1].monitoredItemId = monitoredItemId.current;
                 monitoredItemId.current++;
@@ -220,11 +204,9 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
     React.useEffect(() => {
         if (subscriptionState === SubscriptionState.Open && m.current.monitoredItems.length > 0) {
             if (typeof m.current.subscriptionId === 'number') {
-                //addNewMonitoredItem(m.current.monitoredItems, m.current.internalHandle, m.current.subscriptionId);
                 addMonitoredItemAPI(addNewMonitoredItem, m.current.monitoredItems, mySubscriptionContext);
             }
         }
-        //setCounter(counter => counter + 1);
     }, [subscriptionState, addNewMonitoredItem]);
     
 
@@ -241,13 +223,12 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
         m.current.monitoredItems.splice(index, 1);
 
         if (variables.length == 0) {
-            setIsSubscriptionEnabled(false);
+            //setIsSubscriptionEnabled(false);
             if (typeof subscriptionId === "number" && typeof deleteSubscription === "function") {
                 deleteSubscriptionAPI(deleteSubscription, mySubscriptionContext);
                 mySubscriptionContext.subscriptionID = -1;
                 monitoredItemId.current = 1;
                 didRequestSubscription.current = false;
-                //deleteSubscription(subscriptionId);
             }
         }
     };
@@ -264,37 +245,6 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
             }
         };
     }, [removeMonitoredItems]);
-
-    /**
-     * Effect to trigger render when a publish response is received.
-     * It updates the counter and sets the items.
-     */
-    /*
-    React.useEffect(() => {
-        setCounter(counter => counter + 1);
-    }, [lastSequenceNumber]);
-    */
-
-    // Browse the root node when it changes and subscribe to the variables
-    React.useEffect(() => {
-        async function changeRoot() {
-            const items: IMonitoredItem[] = m.current.monitoredItems;
-            unsubscribe(items, m.current.internalHandle);
-            m.current.monitoredItems = [];
-            setVariables([]);
-        }
-        async function browse(nodeId: string) {
-            await changeRoot();
-            if (nodeId) {
-                m.current.internalHandle = HandleFactory.increment() + 20000
-                m.current.requests.push(m.current.internalHandle);
-                browseChildren(m.current.internalHandle, nodeId);
-            }
-        }
-        if (rootId) {
-            browse(rootId);
-        }
-    }, [rootId, browseChildren, subscriptionState, unsubscribe, subscribe]);
 
     /**
      * Effect to read values when the state changes.
@@ -331,29 +281,7 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
         if (results) {
             results?.forEach(result => {
                 m.current.requests = m.current.requests.filter(x => x !== result.callerHandle);
-                if (result.children) {
-                    const items: IMonitoredItem[] = [];
-                    const newVariables: Row[] = [];
-                    result.children.forEach((x) => {
-                        if (x?.reference?.NodeClass === OpcUa.NodeClass.Variable && x?.reference?.NodeId) {
-                            items.push({
-                                nodeId: x.reference.NodeId,
-                                subscriberHandle: HandleFactory.increment() + 20000
-                            });
-                            if (x?.reference?.DisplayName?.Text) {
-                                newVariables.push({ name: x?.reference?.DisplayName?.Text, item: items[items.length - 1] });
-                            }
-                        }
-                    });
-                    m.current.monitoredItems = items;
-                    if (subscriptionState === SubscriptionState.Open) {
-                        if (typeof m.current.subscriptionId === 'number') {
-                            subscribe(items, m.current.internalHandle, m.current.subscriptionId);
-                        }
-                    }
-                    setVariables(newVariables);
-                }
-                else if (result.values) {
+               if (result.values) {
                     result.values.forEach((x) => {
                         const mi = variables.find(y => y.item.subscriberHandle === x.id)
                         if (mi) {
@@ -365,23 +293,17 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
                 }
             });
         }
-    }, [responseCount, processResults, variables, subscribe, subscriptionState]);
-
-    /*
-    if (!variables?.length || counter === 0) {
-        return (
-            <Paper elevation={3} sx={{ height: '100%', width: 'auto', p: '4px' }} >
-                <Skeleton variant='rounded' height={300}></Skeleton>
-            </Paper>
-        );
-    };
-    */
+    }, [responseCount, processResults, variables, subscriptionState]);
 
     const didRequestSubscription = React.useRef(false);
 
+    /**
+     * Effect when a new subscription ID is received.
+     * If the didRequestSubscription flag is true, it means that a the OPC UA part requested a subscription and
+     * the monitored items can be set.
+     */
     React.useEffect(() => {
         if (didRequestSubscription.current && subscriptionId) {
-            console.log('Add Monitored Item');
             m.current.subscriptionId = subscriptionId;
             mySubscriptionContext.subscriptionID = subscriptionId;
             addMonitoredItemAPI(addNewMonitoredItem, m.current.monitoredItems, mySubscriptionContext);
@@ -393,9 +315,6 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
 
     // Effect to detect when a new element is added to the variables array
     React.useEffect(() => {
-
-        //console.log('A new element was added to the variables array.');
-
         // Read values for new variables
         if (readValues && variables.length) {
             const nodesToRead: IReadValueId[] = [];

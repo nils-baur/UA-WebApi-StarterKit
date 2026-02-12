@@ -7,9 +7,6 @@ export type publishCB = (...args: any[]) => void; // Adjust the signature as nee
 export type LPVOID = any; // Use a more specific type if possible
 export type subscriptionIDType = number; // Or string, depending on your implementation
 
-// Type definitions (adjust as needed)
-//type subscriptionParameters = any; // Replace with your actual type
-
 const MAX_SUBSCRIPTIONS = 10; // Set to your actual max
 const INVALID_SUBSCRIPTION_ID = -1;
 const ERROR_NO_AVAILABLE_SUBSCRIPTION = -2;
@@ -26,6 +23,8 @@ const activeSubscriptions: subscriptionContext[] = Array.from({ length: MAX_SUBS
     subscriptionID: INVALID_SUBSCRIPTION_ID,
 }));
 
+// Handles the publish callback for a given subscription.
+// Invokes the registered callback if the subscription ID matches.
 export function handlePublishCallbackAPI(
     prm: OpcUa.PublishResponse,
     monitoredItems: Map<number, IMonitoredItem>,
@@ -38,6 +37,12 @@ export function handlePublishCallbackAPI(
     }
 }
 
+/**
+ * Creates a new subscription and registers its callback/context.
+ * @param createSubscription Function to call for creating the subscription.
+ * @param subscriptionRequest The subscription context to register.
+ * @returns 1 if successful, or an error code if no slot is available.
+ */
 export function createSubscriptionAPI(
     createSubscription: () => void,
     subscriptionRequest: subscriptionContext
@@ -59,6 +64,13 @@ export function createSubscriptionAPI(
     return ERROR_NO_AVAILABLE_SUBSCRIPTION;
 }
 
+/**
+ * Adds monitored items to an existing subscription.
+ * @param addNewMonitoredItem Function to add monitored items.
+ * @param itemArray Array of items to monitor.
+ * @param subscriptionRequest The subscription context.
+ * @returns 1 if successful, or an error code if subscription not found.
+ */
 export function addMonitoredItemAPI(
     addNewMonitoredItem: () => void,
     itemArray: IMonitoredItem[],
@@ -75,6 +87,14 @@ export function addMonitoredItemAPI(
     return ERROR_NO_AVAILABLE_SUBSCRIPTION;
 }
 
+/**
+ * Removes a single monitored item from a subscription.
+ * @param removeMonitoredItem Function to remove the monitored item.
+ * @param itemArray Array of monitored items.
+ * @param index Index of the item to remove.
+ * @param subscriptionRequest The subscription context.
+ * @returns 1 if successful, or an error code if subscription not found.
+ */
 export function removeMonitoredItemAPI(
     removeMonitoredItem: () => void,
     itemArray: IMonitoredItem[],
@@ -93,6 +113,13 @@ export function removeMonitoredItemAPI(
     return ERROR_NO_AVAILABLE_SUBSCRIPTION;
 }
 
+/**
+ * Removes multiple monitored items from a subscription.
+ * @param removeMonitoredItems Function to remove monitored items.
+ * @param itemArray Array of monitored items to remove.
+ * @param subscriptionRequest The subscription context.
+ * @returns The subscription ID if successful, or an error code if not found.
+ */
 export function removeMonitoredItemsAPI(
     removeMonitoredItems: () => void,
     itemArray: IMonitoredItem[],
@@ -110,6 +137,12 @@ export function removeMonitoredItemsAPI(
     return ERROR_NO_AVAILABLE_SUBSCRIPTION;
 }
 
+/**
+ * Deletes a subscription and frees its slot.
+ * @param deleteSubscription Function to delete the subscription.
+ * @param subscriptionRequest The subscription context.
+ * @returns 1 if successful, or an error code if subscription not found.
+ */
 export function deleteSubscriptionAPI(
     deleteSubscription: () => void,
     subscriptionRequest: subscriptionContext
@@ -127,6 +160,12 @@ export function deleteSubscriptionAPI(
     return ERROR_NO_AVAILABLE_SUBSCRIPTION;
 }
 
+/**
+ * Enables or disables publishing for all active subscriptions.
+ * @param setIsSubscriptionEnabled Function to enable/disable publishing.
+ * @param value Boolean indicating whether to enable or disable.
+ * @returns 1 after processing all subscriptions.
+ */
 export function enablePublishingAPI(
     setIsSubscriptionEnabled: (enabled: boolean, subscriptionID: number) => void,
     value: boolean): number {

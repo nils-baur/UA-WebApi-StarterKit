@@ -8,8 +8,10 @@ import ContextMenu from "../ContextMenu";
 import { SessionContext } from "../SessionContext";
 import { sendAASRequest } from "../utils/SendAASRequest";
 
-//import { IMonitoredItem } from '../SubscriptionProvider';
+import { IMonitoredItem } from '../SubscriptionProvider';
 import { SubscriptionContext } from '../SubscriptionContext';
+import { createSubscriptionAPI, addMonitoredItemAPI, deleteSubscriptionAPI, removeMonitoredItemsAPI, removeMonitoredItemAPI } from '../SubscriptionAPI';
+
 
 interface TreeNode {
     id: string;
@@ -23,6 +25,13 @@ interface TreeNode {
     pollIntervalId?: number;
     value?: any;
 }
+
+export const mySubscriptionContext = {
+    subscriptionID: -1,
+    publishCB: null,
+    publishCtx: {} // or your context value
+};
+
 
 const AASTreeView: React.FC = () => {
     const [treeData, setTreeData] = useState<TreeNode | null>(null);
@@ -42,11 +51,19 @@ const AASTreeView: React.FC = () => {
         createSubscription,
         deleteSubscription,
         subscriptionId,
-        setIsSubscriptionEnabled,
-        subscribe,
-        unsubscribe,
-        lastSequenceNumber
+        //setIsSubscriptionEnabled
     } = React.useContext(SubscriptionContext);
+
+    const monitoredItemId = React.useRef(1);
+    const didRequestSubscription = React.useRef(false);
+
+    const handlePublish = (
+        data: any,
+        monitoredItems: Map<number, IMonitoredItem>) => {
+        console.log("Received publish update:", data, monitoredItems);
+        //TODO: Update accessViewItems based on the monitoredItems map and the data received
+    };
+
     
     useEffect(() => {
         sessionRef.current = session;
@@ -158,6 +175,15 @@ const AASTreeView: React.FC = () => {
 
     const registeredViaWebSocket = useRef<Set<string>>(new Set());
 
+    React.useEffect(() => {
+        if (didRequestSubscription.current && subscriptionId) {
+            mySubscriptionContext.subscriptionID = subscriptionId;
+            //addMonitoredItemAPI(addNewMonitoredItem, m.current.monitoredItems, mySubscriptionContext);
+            monitoredItemId.current++;
+            didRequestSubscription.current = false; // Reset the flag
+        }
+    }, [subscriptionId]);
+
     const handleOnAddAccessView = useCallback(() => {
         if (!contextMenu?.node) return;
 
@@ -166,9 +192,23 @@ const AASTreeView: React.FC = () => {
         const path = node.path!;
         const url = `/shells/${encodeId(node.parentAASId!)}/submodels/${encodeId(node.parentSubmodelId!)}/submodel-elements/${path}`;
 
-        
-        if (typeof createSubscription === "function") {
-            createSubscription();
+        if (mySubscriptionContext.subscriptionID == -1) {
+            if (typeof createSubscription === "function") {
+                mySubscriptionContext.publishCB = handlePublish;
+                //mySubscriptionContext.publishCtx = newVariables; // or your context value
+                const result = createSubscriptionAPI(createSubscription, mySubscriptionContext);
+
+                if (result !== -2) {
+                    console.log('Subscription created with ID:', result);
+                } else {
+                    console.error('Failed to create subscription: No available subscription slots.');
+                }
+                didRequestSubscription.current = true;
+            }
+        }
+        else {
+            //addMonitoredItemAPI(addNewMonitoredItem, m.current.monitoredItems, mySubscriptionContext);
+            monitoredItemId.current++;
         }
         
         const fetchAndUpdate = async () => {
@@ -240,9 +280,15 @@ const AASTreeView: React.FC = () => {
         });
         setAccessViewContextMenu(null);
 
-        if (typeof createSubscription === "function") {
-            deleteSubscription();
-        }
+        //removeMonitoredItemAPI(removeMonitoredItem, mySubscriptionContext, item.path!);
+        //if (prev.length == 0) {
+            if (typeof createSubscription === "function") {
+                deleteSubscriptionAPI(deleteSubscription, mySubscriptionContext);
+                mySubscriptionContext.subscriptionID = -1;
+                monitoredItemId.current = 1;
+                didRequestSubscription.current = false;
+            }
+        //}
     };
 
     const renderValue = (val: any): string => {
