@@ -169,11 +169,15 @@ export function deleteSubscriptionAPI(
 export function enablePublishingAPI(
     setIsSubscriptionEnabled: (enabled: boolean, subscriptionID: number) => void,
     value: boolean): number {
+    const subscriptions: number[] = [];
     for (let i = 0; i < MAX_SUBSCRIPTIONS; i++) {
         if (activeSubscriptions[i].subscriptionID != INVALID_SUBSCRIPTION_ID) {
-            setIsSubscriptionEnabled(value, activeSubscriptions[i].subscriptionID);
+            subscriptions.push(activeSubscriptions[i].subscriptionID);
+            //setIsSubscriptionEnabled(value, activeSubscriptions);
         }
+
     }
+    setIsSubscriptionEnabled(value, subscriptions)
     return 1;
 }
 

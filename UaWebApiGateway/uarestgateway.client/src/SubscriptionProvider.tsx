@@ -27,7 +27,7 @@ export interface ISubscriptionContext {
    samplingInterval?: number,
    setSamplingInterval: (interval: number) => void,
    isSubscriptionEnabled: boolean,
-   setIsSubscriptionEnabled: (enabled: boolean, subscriptionID: number) => void,
+   setIsSubscriptionEnabled: (enabled: boolean, subscriptionID: number[]) => void,
    subscriptionState: SubscriptionState,
    lastSequenceNumber: number,
    addNewMonitoredItem: (items: IMonitoredItem[], clientHandle: number, subsctiptionId: number) => void,
@@ -445,20 +445,24 @@ export const SubscriptionProvider = ({ children }: SubscriptionProps) => {
       deleteMonitoredItems(items, subscriptionId);
    }, [deleteMonitoredItems]);
 
-    const setIsSubscriptionEnabledImpl = React.useCallback((value: boolean, subscriptionId: number) => {
+    const setIsSubscriptionEnabledImpl = React.useCallback((value: boolean, subscriptionId: number[]) => {
       console.log("Set subscription enabled: " + value);
         if (!subscriptionId) {
          return;
       }
-      else if (m.current.subscriptionState === SubscriptionState.Closed) {
-         enablePublishing(value, subscriptionId);
+        else if (m.current.subscriptionState === SubscriptionState.Closed) {
+            subscriptionId.forEach((id) => {
+                enablePublishing(value, id);
+            });
          //console.warn(m.current.monitoredItems);
          m.current.subscriptionState = SubscriptionState.Open;
          setSubscriptionState(SubscriptionState.Open);
          return;
       }
-      else if (m.current.subscriptionState === SubscriptionState.Open) {
-          enablePublishing(value, subscriptionId);
+        else if (m.current.subscriptionState === SubscriptionState.Open) {
+          subscriptionId.forEach((id) => {
+            enablePublishing(value, id);
+          });
           m.current.subscriptionState = SubscriptionState.Closed;
           setSubscriptionState(SubscriptionState.Closed);
          return;

@@ -266,7 +266,7 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
             m.current.internalHandle = HandleFactory.increment();
             m.current.requests.push(m.current.internalHandle);
             console.error("readValues[" + nodesToRead.length + "]: " + m.current.internalHandle);
-            readValues(m.current.internalHandle, nodesToRead);
+            //readValues(m.current.internalHandle, nodesToRead);
         }
     }, [readValues, variables]);
 
