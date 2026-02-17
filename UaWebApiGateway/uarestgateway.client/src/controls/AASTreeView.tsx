@@ -24,7 +24,15 @@ interface TreeNode {
     path?: string;
     pollIntervalId?: number;
     value?: any;
+    isOpcUa?: boolean;
+    nodeId?: string | null;
 }
+
+type SubmodelElementInfoDto = {
+    submodelElement: any; 
+    isOpcUa: boolean;
+    nodeId: string | null;
+};
 
 export const mySubscriptionContext = {
     subscriptionID: -1,
@@ -56,6 +64,7 @@ const AASTreeView: React.FC = () => {
 
     const monitoredItemId = React.useRef(1);
     const didRequestSubscription = React.useRef(false);
+    const mappedNodeId= React.useRef("");
 
     const handlePublish = (
         data: any,
@@ -178,86 +187,138 @@ const AASTreeView: React.FC = () => {
     React.useEffect(() => {
         if (didRequestSubscription.current && subscriptionId) {
             mySubscriptionContext.subscriptionID = subscriptionId;
-            //addMonitoredItemAPI(addNewMonitoredItem, m.current.monitoredItems, mySubscriptionContext);
+            const items: IMonitoredItem[] = [];
+            items.push({
+                nodeId: mappedNodeId.current,
+                //subscriberHandle: HandleFactory.increment(),
+            });
+            addMonitoredItemAPI(addNewMonitoredItem, items, mySubscriptionContext);
             monitoredItemId.current++;
             didRequestSubscription.current = false; // Reset the flag
         }
     }, [subscriptionId]);
+
+    type SubmodelElementInfoDto = {
+        submodelElement?: any;
+        isOpcUa?: boolean;
+        nodeId?: string | null;
+
+        // fallback (PascalCase)
+        SubmodelElement?: any;
+        IsOpcUa?: boolean;
+        NodeId?: string | null;
+    };
 
     const handleOnAddAccessView = useCallback(() => {
         if (!contextMenu?.node) return;
 
         const node = contextMenu.node;
         const session = sessionRef.current;
+
         const path = node.path!;
-        const url = `/shells/${encodeId(node.parentAASId!)}/submodels/${encodeId(node.parentSubmodelId!)}/submodel-elements/${path}`;
+        const url = `/shells/${encodeId(node.parentAASId!)}/submodels/${encodeId(
+            node.parentSubmodelId!
+        )}/submodel-elements/${path}`;
+        const infoUrl = `${url}/info`;
 
-        if (mySubscriptionContext.subscriptionID == -1) {
-            if (typeof createSubscription === "function") {
-                mySubscriptionContext.publishCB = handlePublish;
-                //mySubscriptionContext.publishCtx = newVariables; // or your context value
-                const result = createSubscriptionAPI(createSubscription, mySubscriptionContext);
-
-                if (result !== -2) {
-                    console.log('Subscription created with ID:', result);
-                } else {
-                    console.error('Failed to create subscription: No available subscription slots.');
-                }
-                didRequestSubscription.current = true;
-            }
-        }
-        else {
-            //addMonitoredItemAPI(addNewMonitoredItem, m.current.monitoredItems, mySubscriptionContext);
-            monitoredItemId.current++;
-        }
-        
         const fetchAndUpdate = async () => {
             const value = await fetchValue(node);
             setAccessViewItems(prev =>
-                prev.map(i => i.id === node.id ? { ...i, value } : i)
+                prev.map(i => (i.id === node.id ? { ...i, value } : i))
             );
         };
 
         const updateItem = (patch: Partial<TreeNode>) => {
             setAccessViewItems(prev =>
-                prev.map(i => i.id === node.id ? { ...i, ...patch } : i)
+                prev.map(i => (i.id === node.id ? { ...i, ...patch } : i))
             );
         };
 
-        // If the item already exists in access view, cancel its poll
-        const existing = accessViewItems.find(i => i.id === node.id);
-        if (existing?.pollIntervalId) {
-            clearInterval(existing.pollIntervalId);
-            updateItem({ pollIntervalId: undefined });
-        }
-
-        // Fetch once for value display
-        fetchAndUpdate();
-
-        if (session.isConnected) {
-            // WebSocket mode
-            console.log("Connected to websocket");
-            if (!registeredViaWebSocket.current.has(path)) {
-                registeredViaWebSocket.current.add(path);
-                sendAASRequest(session, "GET", url).catch(err => {
-                    console.error("WebSocket GET failed:", err);
-                    registeredViaWebSocket.current.delete(path);
-                });
+        const run = async () => {
+            // If the item already exists in access view, cancel its poll
+            const existing = accessViewItems.find(i => i.id === node.id);
+            if (existing?.pollIntervalId) {
+                clearInterval(existing.pollIntervalId);
+                updateItem({ pollIntervalId: undefined });
             }
-            if (!existing) {
-                setAccessViewItems(prev => [...prev, { ...node }]);
+
+            // 1) Call infoUrl once to get IsOpcUa + NodeId (+ element)
+            let isOpcUa = false;
+            
+            let returnedElement: any = null;
+
+            try {
+                const info: SubmodelElementInfoDto = await sendAASRequest(session, "GET", infoUrl);
+
+                returnedElement = info.submodelElement ?? info.SubmodelElement ?? null;
+                isOpcUa = (info.isOpcUa ?? info.IsOpcUa) ?? false;
+                mappedNodeId.current = (info.nodeId ?? info.NodeId) ?? null;
+                console.log(`[AAS] NodeId: ${isOpcUa} ${mappedNodeId}`)
+
+                if (mySubscriptionContext.subscriptionID == -1) {
+                    if (typeof createSubscription === "function") {
+                        mySubscriptionContext.publishCB = handlePublish;
+                        //mySubscriptionContext.publishCtx = newVariables; // or your context value
+                        const result = createSubscriptionAPI(createSubscription, mySubscriptionContext);
+
+                        if (result !== -2) {
+                            console.log('Subscription created with ID:', result);
+                        } else {
+                            console.error('Failed to create subscription: No available subscription slots.');
+                        }
+                        didRequestSubscription.current = true;
+                    }
+                }
+                else {
+                    const items: IMonitoredItem[] = [];
+                    items.push({
+                        nodeId: mappedNodeId,
+                        //subscriberHandle: HandleFactory.increment(),
+                    });
+                    addMonitoredItemAPI(addNewMonitoredItem, items, mySubscriptionContext);
+                    monitoredItemId.current++;
+                }
+
+                // store info on the access view item (optional but useful)
+                if (!existing) {
+                    setAccessViewItems(prev => [
+                        ...prev,
+                        {
+                            ...node,
+                            isOpcUa,
+                            mappedNodeId,
+                            ...(returnedElement ? { original: returnedElement } : {})
+                        }
+                    ]);
+                } else {
+                    updateItem({
+                        isOpcUa,
+                        mappedNodeId,
+                        ...(returnedElement ? { original: returnedElement } : {})
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to load info from infoUrl:", err);
+
+                // still ensure item exists
+                if (!existing) {
+                    setAccessViewItems(prev => [...prev, { ...node }]);
+                }
             }
-        } else {
-            // Fallback to polling
+
+            // 3) Fetch once for value display and then keep polling
+            await fetchAndUpdate();
             const intervalId = window.setInterval(fetchAndUpdate, 3000);
-            if (!existing) {
-                setAccessViewItems(prev => [...prev, { ...node, pollIntervalId: intervalId }]);
-            } else {
-                updateItem({ pollIntervalId: intervalId });
-            }
-        }
 
-        handleCloseContextMenu();
+            // attach poll interval id
+            setAccessViewItems(prev =>
+                prev.map(i => (i.id === node.id ? { ...i, pollIntervalId: intervalId } : i))
+            );
+
+            handleCloseContextMenu();
+        };
+
+        run();
     }, [contextMenu, accessViewItems]);
 
     const handleContextMenu = (event: React.MouseEvent, node: TreeNode) => {

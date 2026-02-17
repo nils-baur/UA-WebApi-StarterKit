@@ -1,84 +1,68 @@
+using AasCore.Aas3_0;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using Opc.Ua;
-using UaRestGateway.Server.Service;
-using StatusCodes = Opc.Ua.StatusCodes;
-using ISession = Opc.Ua.Client.ISession;
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Nodes;
 using UaRestGateway.Server.Model;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using UaRestGateway.Server.Service;
+using UaRestGateway.Server.Service.AAS;
+using ISession = Opc.Ua.Client.ISession;
+using StatusCodes = Opc.Ua.StatusCodes;
 
 
 namespace UaRestGateway.Server.Controllers
 {
     [ApiController]
-    [Route("aas")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public class AasController : CommonController
+    public class AasController : ControllerBase
     {
-        public AasController(
-            IConfiguration configuration,
-            ILogger<AasController> logger,
-            DatabaseContext context,
-            IMemoryCache cache,
-            IUACommunicationService communicationService)
-        :
-            base(configuration, logger, context, cache, communicationService)
+        private readonly ILogger<AasController> _logger;
+        private readonly IAASCommunicationService _aasCommunicationService;
+        private readonly IBase64UrlDecoderService _decoderService;
+
+        public AasController(ILogger<AasController> logger, IAASCommunicationService aasCommunicationService, IBase64UrlDecoderService decoderService)
         {
+            _logger = logger;
+            _aasCommunicationService = aasCommunicationService;
+            _decoderService = decoderService;
         }
 
-        [HttpPost]
-        [Route("read")]
-        public async Task<IActionResult> Read()
+        public class SubmodelElementInfo
         {
-            try
-            {
-                // Implement your AAS-specific read logic here
-                return Ok(new { Message = "AAS Read operation successful" });
-            }
-            catch (Exception e)
-            {
-                return await Fault(e);
-            }
-        }
+            ISubmodelElement SubmodelElement { get; set; }
+            bool IsOpcUa { get; set; }
+            NodeId NodeId { get; set; }
 
-        [HttpPost]
-        [Route("write")]
-        public async Task<IActionResult> Write()
-        {
-            try
+            public SubmodelElementInfo(ISubmodelElement submodelElement, bool isOpcUa, NodeId nodeId)
             {
-                // Implement your AAS-specific write logic here
-                return Ok(new { Message = "AAS Write operation successful" });
-            }
-            catch (Exception e)
-            {
-                return await Fault(e);
+                SubmodelElement = submodelElement;
+                IsOpcUa = isOpcUa;
+                NodeId = nodeId;
             }
         }
 
-        private async Task<IActionResult> Fault(Exception e)
+        [HttpGet]
+        [Route("/api/v3.0/shells/{aasIdentifier}/submodels/{submodelIdentifier}/submodel-elements/{idShortPath}/info")]
+        public virtual async Task<IActionResult> GetSubmodelElementInfoAsync([FromRoute][Required] string aasIdentifier, [FromRoute][Required] string submodelIdentifier, [FromRoute][Required] string idShortPath)
         {
-            Logger.LogWarning(e, "Fault calling Service.");
+            var decodedAasId = _decoderService.Decode("aasIdentifier", aasIdentifier);
+            var decodedSubmodelId = _decoderService.Decode("submodelIdentifier", submodelIdentifier);
 
-            IServiceMessageContext context = Server.MessageContext ?? ServiceMessageContext.GlobalContext;
+            _logger.LogDebug($"Received REST request to get sme {idShortPath}");
 
-            var sr = new ServiceResult(e, StatusCodes.BadUnexpectedError);
+            var (element, isOpcUa, nodeId) = await _aasCommunicationService.GetSubmodelElementInfoAsync(decodedAasId, decodedSubmodelId, idShortPath).ConfigureAwait(false);
 
-            ServiceFault fault = new ServiceFault()
-            {
-                ResponseHeader = new ResponseHeader()
-                {
-                    Timestamp = DateTime.UtcNow,
-                    ServiceResult = sr.StatusCode,
-                    StringTable = new StringCollection(new string[] { sr.ToString() }),
-                    ServiceDiagnostics = new DiagnosticInfo() { LocalizedText = 0 }
-                }
-            };
+            var output = new SubmodelElementInfo(element, isOpcUa, nodeId);
 
-            var stream = await MessageUtils.Encode<ServiceFault>(context, fault, false);
+            var outputJson = new JsonObject();
+            outputJson["submodelElement"] = Jsonization.Serialize.ToJsonObject(element);
+            outputJson["isOpcUa"] = isOpcUa;
+            outputJson["nodeId"] = nodeId.ToString();
 
-            return File(stream, "application/json");
+            return Ok(outputJson);
         }
+
     }
 }
