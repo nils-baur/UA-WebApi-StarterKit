@@ -59,7 +59,10 @@ namespace UaRestGateway.Server.Controllers
             var outputJson = new JsonObject();
             outputJson["submodelElement"] = Jsonization.Serialize.ToJsonObject(element);
             outputJson["isOpcUa"] = isOpcUa;
-            outputJson["nodeId"] = nodeId.ToString();
+            if (isOpcUa)
+            {
+                outputJson["nodeId"] = nodeId.ToString(); 
+            }
 
             return Ok(outputJson);
         }
