@@ -1,6 +1,6 @@
 import React from 'react';
 import HomePage from './pages/HomePage';
-import LoginPage from './pages/LoginPage';
+//import LoginPage from './pages/LoginPage';
 import Swagger from './Swagger';
 
 export interface PageRoute {
@@ -22,12 +22,6 @@ const AppRoutes : PageRoute[] = [
       path: '/swagger',
       appId: 1,
       element: <Swagger />
-   },
-   {
-      name: "main.login",
-      path: '/login',
-      appId: -1,
-      element: <LoginPage />
    }
 ];
 

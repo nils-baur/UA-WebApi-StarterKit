@@ -12,6 +12,7 @@ import { IMonitoredItem } from '../SubscriptionProvider';
 import { SubscriptionContext } from '../SubscriptionContext';
 import { createSubscriptionAPI, addMonitoredItemAPI, deleteSubscriptionAPI, removeMonitoredItemsAPI, removeMonitoredItemAPI } from '../SubscriptionAPI';
 
+import * as OpcUa from 'opcua-webapi';
 
 interface TreeNode {
     id: string;
@@ -34,10 +35,15 @@ type SubmodelElementInfoDto = {
     nodeId: string | null;
 };
 
+type mappedIds = {
+    nodeId: string;
+    itemId: number;
+};
 export const mySubscriptionContext = {
     subscriptionID: -1,
     publishCB: null,
-    publishCtx: {} // or your context value
+    publishCtx: {}, // or your context value
+    mappedNodeIDs: [] as mappedIds[], // to track nodeIds for monitored items
 };
 
 
@@ -52,25 +58,42 @@ const AASTreeView: React.FC = () => {
     const sessionRef = useRef(session);
     
     const {
-        subscriptionState,
         addNewMonitoredItem,
-        removeMonitoredItems,
         removeMonitoredItem,
         createSubscription,
         deleteSubscription,
         subscriptionId,
-        //setIsSubscriptionEnabled
     } = React.useContext(SubscriptionContext);
 
     const monitoredItemId = React.useRef(1);
     const didRequestSubscription = React.useRef(false);
-    const mappedNodeId= React.useRef("");
+    const mappedNodeId = React.useRef<string[]>([]);
 
     const handlePublish = (
         data: any,
         monitoredItems: Map<number, IMonitoredItem>) => {
         console.log("Received publish update:", data, monitoredItems);
-        //TODO: Update accessViewItems based on the monitoredItems map and the data received
+        setAccessViewItems(prev => prev.map(item => {
+            data.NotificationMessage?.NotificationData.forEach((eo) => {
+                if (eo.UaTypeId === OpcUa.DataTypeIds.DataChangeNotification) {
+                    const dcn = eo as OpcUa.DataChangeNotification;
+                    dcn.MonitoredItems?.forEach((ii) => {
+                        const itemValue = ii.Value?.Value;
+                        monitoredItems.forEach((mi) => {
+                            mySubscriptionContext.mappedNodeIDs.forEach((mappedId) => {
+                                if (item.isOpcUa && mappedId.nodeId === mi.nodeId) {
+                                    console.log(`Updating item ${item.name} with new value:`, itemValue);
+                                    setAccessViewItems(prevItems => prevItems.map(i => i.id === item.id ? { ...i, value: itemValue } : i));
+                                    return { ...item, itemValue };
+                                }
+                            });
+                        });
+                    });
+                }
+            });
+
+            return item;
+        }));
     };
 
     
@@ -189,10 +212,10 @@ const AASTreeView: React.FC = () => {
             mySubscriptionContext.subscriptionID = subscriptionId;
             const items: IMonitoredItem[] = [];
             items.push({
-                nodeId: mappedNodeId.current,
-                //subscriberHandle: HandleFactory.increment(),
+                nodeId: mySubscriptionContext.mappedNodeIDs[0].nodeId,
             });
             addMonitoredItemAPI(addNewMonitoredItem, items, mySubscriptionContext);
+            mySubscriptionContext.mappedNodeIDs[0].itemId = monitoredItemId.current;
             monitoredItemId.current++;
             didRequestSubscription.current = false; // Reset the flag
         }
@@ -252,13 +275,16 @@ const AASTreeView: React.FC = () => {
 
                 returnedElement = info.submodelElement ?? info.SubmodelElement ?? null;
                 isOpcUa = (info.isOpcUa ?? info.IsOpcUa) ?? false;
-                mappedNodeId.current = (info.nodeId ?? info.NodeId) ?? null;
+
+                const nodeId = info.nodeId ?? info.NodeId;
+                if (typeof nodeId === "string" && nodeId.length > 0) {
+                    mySubscriptionContext.mappedNodeIDs.push({ nodeId, itemId: monitoredItemId.current });
+                }
                 console.log(`[AAS] NodeId: ${isOpcUa} ${mappedNodeId}`)
 
-                if (mySubscriptionContext.subscriptionID == -1) {
+                if (mySubscriptionContext.subscriptionID == -1 && isOpcUa) {
                     if (typeof createSubscription === "function") {
                         mySubscriptionContext.publishCB = handlePublish;
-                        //mySubscriptionContext.publishCtx = newVariables; // or your context value
                         const result = createSubscriptionAPI(createSubscription, mySubscriptionContext);
 
                         if (result !== -2) {
@@ -269,17 +295,18 @@ const AASTreeView: React.FC = () => {
                         didRequestSubscription.current = true;
                     }
                 }
-                else {
+                else if (mySubscriptionContext.subscriptionID != -1 && isOpcUa){
                     const items: IMonitoredItem[] = [];
                     items.push({
-                        nodeId: mappedNodeId,
-                        //subscriberHandle: HandleFactory.increment(),
+                        nodeId: mySubscriptionContext.mappedNodeIDs[mySubscriptionContext.mappedNodeIDs.length - 1].nodeId,
                     });
                     addMonitoredItemAPI(addNewMonitoredItem, items, mySubscriptionContext);
+                    mySubscriptionContext.mappedNodeIDs[mySubscriptionContext.mappedNodeIDs.length - 1].itemId = monitoredItemId.current;
                     monitoredItemId.current++;
                 }
 
                 // store info on the access view item (optional but useful)
+                
                 if (!existing) {
                     setAccessViewItems(prev => [
                         ...prev,
@@ -297,6 +324,7 @@ const AASTreeView: React.FC = () => {
                         ...(returnedElement ? { original: returnedElement } : {})
                     });
                 }
+                
             } catch (err) {
                 console.error("Failed to load info from infoUrl:", err);
 
@@ -307,14 +335,16 @@ const AASTreeView: React.FC = () => {
             }
 
             // 3) Fetch once for value display and then keep polling
+            
             await fetchAndUpdate();
+            /*
             const intervalId = window.setInterval(fetchAndUpdate, 3000);
-
+            
             // attach poll interval id
             setAccessViewItems(prev =>
                 prev.map(i => (i.id === node.id ? { ...i, pollIntervalId: intervalId } : i))
             );
-
+            */
             handleCloseContextMenu();
         };
 
@@ -334,22 +364,34 @@ const AASTreeView: React.FC = () => {
     };
 
     const handleRemoveAccessViewItem = (index: number) => {
+        const item = accessViewItems[index];
+        if (item.isOpcUa) {
+            const itemToRemove: IMonitoredItem[] = [];
+            mySubscriptionContext.mappedNodeIDs.forEach((mappedId) => {
+                itemToRemove.push({
+                    nodeId: mappedId.nodeId,
+                    monitoredItemId: mappedId.itemId,
+                });
+            });
+
+            removeMonitoredItemAPI(removeMonitoredItem, itemToRemove, index, mySubscriptionContext);
+
+            mySubscriptionContext.mappedNodeIDs.splice(index, 1); // remove the mapped nodeId at the current iteration index   
+        }
+
+        if (typeof createSubscription === "function" && mySubscriptionContext.mappedNodeIDs.length == 0 && mySubscriptionContext.subscriptionID != -1) {
+            deleteSubscriptionAPI(deleteSubscription, mySubscriptionContext);
+            mySubscriptionContext.subscriptionID = -1;
+            monitoredItemId.current = 1;
+            didRequestSubscription.current = false;
+        }
+
         setAccessViewItems(prev => {
             const item = prev[index];
             if (item.pollIntervalId) clearInterval(item.pollIntervalId);
             return prev.filter((_, i) => i !== index);
         });
         setAccessViewContextMenu(null);
-
-        //removeMonitoredItemAPI(removeMonitoredItem, mySubscriptionContext, item.path!);
-        //if (prev.length == 0) {
-            if (typeof createSubscription === "function") {
-                deleteSubscriptionAPI(deleteSubscription, mySubscriptionContext);
-                mySubscriptionContext.subscriptionID = -1;
-                monitoredItemId.current = 1;
-                didRequestSubscription.current = false;
-            }
-        //}
     };
 
     const renderValue = (val: any): string => {

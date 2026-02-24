@@ -370,28 +370,20 @@ export const SubscriptionProvider = ({ children }: SubscriptionProps) => {
 
    React.useEffect(() => {
       if (publishCount !== 0) {
-         //if (sessionState === SessionState.SessionActive) {
-         //if (m.current.isEnabled && m.current.subscriptionState === SubscriptionState.Open) {
          if (m.current.subscriptionState === SubscriptionState.Open) {
                console.warn("Publish " + publishCount);
                publish();
          }
-         //}
       }
    }, [publishCount, sessionState, publish]);
 
    React.useEffect(() => {
       switch (sessionState) {
          case SessionState.SessionActive:
-            if (m.current.isEnabled && m.current.subscriptionState === SubscriptionState.Closed) {
-               //createSubscription();
-            }
+
             break;
-         default:
-            //m.current.subscriptionId = undefined;
+         default:;
             m.current.acknowledgements = [];
-            //m.current.subscriptionState = SubscriptionState.Closed;
-            //setSubscriptionState(m.current.subscriptionState);
             setLastSequenceNumber(0);
             break;
       }
@@ -414,8 +406,6 @@ export const SubscriptionProvider = ({ children }: SubscriptionProps) => {
                 m.current.monitoredItems.delete(item.itemHandle);
             }
         });
-        //TODO
-        //deleteMonitoredItems(items);
     }, [deleteMonitoredItems]);
     
 
@@ -454,7 +444,6 @@ export const SubscriptionProvider = ({ children }: SubscriptionProps) => {
             subscriptionId.forEach((id) => {
                 enablePublishing(value, id);
             });
-         //console.warn(m.current.monitoredItems);
          m.current.subscriptionState = SubscriptionState.Open;
          setSubscriptionState(SubscriptionState.Open);
          return;

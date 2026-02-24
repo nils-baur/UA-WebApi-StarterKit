@@ -119,7 +119,6 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
     } = React.useContext(SubscriptionContext);
 
     const {
-        browseChildren,
         readValues,
         responseCount,
         processResults
@@ -135,13 +134,12 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
                 dcn.MonitoredItems?.forEach((ii) => {
                     const item = monitoredItems.get(ii.ClientHandle ?? 0);
                     if (item) {
-                        console.log(ii.Value);
                         item.value = ii.Value;
                     }
                 });
             }
         });
-        setVariables(variables => [...variables]);
+        setCounter(counter => counter + 1); // Trigger re-render after processing publish data
     };
 
     /**
@@ -177,9 +175,7 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
                 mySubscriptionContext.publishCtx = newVariables; // or your context value
                 const result = createSubscriptionAPI(createSubscription, mySubscriptionContext);
 
-                if (result !== -2) {
-                    console.log('Subscription created with ID:', result);
-                } else {
+                if (result == -2) {
                     console.error('Failed to create subscription: No available subscription slots.');
                 }   
                 didRequestSubscription.current = true;
@@ -223,7 +219,6 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
         m.current.monitoredItems.splice(index, 1);
 
         if (variables.length == 0) {
-            //setIsSubscriptionEnabled(false);
             if (typeof subscriptionId === "number" && typeof deleteSubscription === "function") {
                 deleteSubscriptionAPI(deleteSubscription, mySubscriptionContext);
                 mySubscriptionContext.subscriptionID = -1;
@@ -245,30 +240,6 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
             }
         };
     }, [removeMonitoredItems]);
-
-    /**
-     * Effect to read values when the state changes.
-     * It creates a list of nodes to read and calls the readValues function.
-     */
-    React.useEffect(() => {
-        if (readValues && variables.length) {
-            const nodesToRead: IReadValueId[] = [];
-            variables.forEach((x) => {
-                if (x.item.nodeId) {
-                    nodesToRead.push({
-                        id: x.item.subscriberHandle ?? 0,
-                        nodeId: x.item.nodeId,
-                        path: x.item.path,
-                        attributeId: x.item.attributeId
-                    });
-                }
-            });
-            m.current.internalHandle = HandleFactory.increment();
-            m.current.requests.push(m.current.internalHandle);
-            console.error("readValues[" + nodesToRead.length + "]: " + m.current.internalHandle);
-            //readValues(m.current.internalHandle, nodesToRead);
-        }
-    }, [readValues, variables]);
 
     /**
      * Effect to handle the last completed request.
@@ -330,13 +301,12 @@ export const VariableValueList = ({ rootId, accessViewItems = [] }: VariableValu
             });
             m.current.internalHandle = HandleFactory.increment();
             m.current.requests.push(m.current.internalHandle);
-            console.error("readValues[" + nodesToRead.length + "]: " + m.current.internalHandle);
             readValues(m.current.internalHandle, nodesToRead);
         }
       
         // Perform any additional logic here
         previousLength.current = variables.length;
-    }, [variables, createSubscription]);
+    }, [variables]);
     
 
     return (

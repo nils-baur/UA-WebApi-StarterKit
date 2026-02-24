@@ -43,10 +43,8 @@ export const SessionStatusBar = () => {
     const handleSubscription = React.useCallback((subscriptionState: SubscriptionState) => {
         if (subscriptionState === SubscriptionState.Closed) {
             enablePublishingAPI(setIsSubscriptionEnabled, true);
-            //setIsSubscriptionEnabled(true);
         }
         else {
-            //setIsSubscriptionEnabled(false);
             enablePublishingAPI(setIsSubscriptionEnabled, false);
         }
     }, [setIsSubscriptionEnabled]);

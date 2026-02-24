@@ -202,7 +202,6 @@ export const SessionProvider = ({ children }: SessionProps) => {
                 sendMessage(JSON.stringify(request));
             }
             else {
-                //if (request.ServiceId != "AASRequest") {
                     const callerHandle = requestHeader.RequestHandle;
                     console.error(`===>>> REQUEST: ${apiNames[request.ServiceId ?? ''].path} ${requestHeader.RequestHandle}`);
 
@@ -238,10 +237,6 @@ export const SessionProvider = ({ children }: SessionProps) => {
                             m.current.requests.delete(callerHandle);
                         });
                 }
-                //else {
-                //    console.warn('AAS Call');
-                //}
-         //}
       } catch (error) {
          console.error('Failed to send request:', error);
       }
