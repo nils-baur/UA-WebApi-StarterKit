@@ -31,9 +31,9 @@ namespace UaRestGateway.Server.Controllers
 
         public class SubmodelElementInfo
         {
-            ISubmodelElement SubmodelElement { get; set; }
-            bool IsOpcUa { get; set; }
-            NodeId NodeId { get; set; }
+            public ISubmodelElement SubmodelElement { get; set; }
+            public bool IsOpcUa { get; set; }
+            public NodeId NodeId { get; set; }
 
             public SubmodelElementInfo(ISubmodelElement submodelElement, bool isOpcUa, NodeId nodeId)
             {

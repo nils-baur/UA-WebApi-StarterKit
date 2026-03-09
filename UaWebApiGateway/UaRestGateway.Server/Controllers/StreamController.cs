@@ -17,11 +17,14 @@ using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using UaRestGateway.Server.Model;
 using UaRestGateway.Server.Model.AAS;
 using UaRestGateway.Server.Service;
 using UaRestGateway.Server.Service.AAS;
+using static Opc.Ua.RelativePathFormatter;
+using static UaRestGateway.Server.Controllers.AasController;
 
 namespace UaRestGateway.Server.Controllers
 {
@@ -411,19 +414,24 @@ namespace UaRestGateway.Server.Controllers
                         return;
                     }
 
-                    if (isOpcUa && element is Property prop)
-                    {
-                        var sessionKey = sessionContext.ChannelContext.SecureChannelId;
-                        //m_streamLogger.LogInformation($"Subscription count: {_subscriptions.Count}");
-                        SetupOpcUaSubscription(sessionKey, nodeId, Client, prop, elementPath, requestHandle, webSocket);
-                        return; // async updates will be sent as data arrives
-                    }
-                    else
-                    {
-                        var response = CreateAASResponse(requestHandle, path, element);
-                        await SendJson(webSocket, response);
-                        return;
-                    }
+                    var output = new SubmodelElementInfo(element, isOpcUa, nodeId);
+                    var response = CreateAASResponse(requestHandle, path, output);
+                    await SendJson(webSocket, response);
+                    return;
+
+                    //if (isOpcUa && element is Property prop)
+                    //{
+                    //    var sessionKey = sessionContext.ChannelContext.SecureChannelId;
+                    //    //m_streamLogger.LogInformation($"Subscription count: {_subscriptions.Count}");
+                    //    SetupOpcUaSubscription(sessionKey, nodeId, Client, prop, elementPath, requestHandle, webSocket);
+                    //    return; // async updates will be sent as data arrives
+                    //}
+                    //else
+                    //{
+                    //    var response = CreateAASResponse(requestHandle, path, element);
+                    //    await SendJson(webSocket, response);
+                    //    return;
+                    //}
                 }
 
                 // Fallback: unknown path
@@ -435,6 +443,28 @@ namespace UaRestGateway.Server.Controllers
                 Logger.LogError(ex, "Error handling AASRequest");
                 await SendError(webSocket, -1, "Internal Server Error");
             }
+        }
+
+        private object CreateAASResponse(int requestHandle, string path, SubmodelElementInfo output)
+        {
+            var outputJson = new JsonObject();
+            outputJson["submodelElement"] = Jsonization.Serialize.ToJsonObject(output.SubmodelElement);
+            outputJson["isOpcUa"] = output.IsOpcUa;
+            if (output.IsOpcUa)
+            {
+                outputJson["nodeId"] = output.IsOpcUa.ToString();
+            }
+
+            return new
+            {
+                ServiceId = "AASResponse",
+                Body = new
+                {
+                    RequestHeader = new { AASRequestHandle = requestHandle },
+                    Path = path,
+                    Result = outputJson
+                }
+            };
         }
 
         private object CreateAASResponse(int requestHandle, string path, IClass result)
