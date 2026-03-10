@@ -63,7 +63,6 @@ namespace UaRestGateway.Server.Controllers
             {
                 outputJson["nodeId"] = nodeId.ToString(); 
             }
-
             return Ok(outputJson);
         }
 

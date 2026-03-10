@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UANodeSet LastModified="2025-10-14T11:18:37.225Z" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://opcfoundation.org/UA/2011/03/UANodeSet.xsd" xmlns:uax="http://opcfoundation.org/UA/2008/02/Types.xsd" xmlns:si="http://www.siemens.com/OPCUA/2017/SimaticNodeSetExtensions" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <NamespaceUris>
+        <Uri>http://AAS_CF</Uri>
+        <Uri>http://AAS</Uri>
+    </NamespaceUris>
+    <Models>
+        <Model ModelUri="http://AAS" PublicationDate="2024-12-12T12:01:27+01:00" Version="1.00">
+            <RequiredModel ModelUri="http://opcfoundation.org/UA/" PublicationDate="2023-12-15T00:00:00Z" Version="1.05.03"/>
+            <RequiredModel ModelUri="http://AAS_CF" PublicationDate="2024-12-03T14:18:38+01:00" Version="1.00"/>
+        </Model>
+    </Models>
+    <Aliases>
+        <Alias Alias="Boolean">i=1</Alias>
+        <Alias Alias="Double">i=11</Alias>
+        <Alias Alias="DateTime">i=13</Alias>
+        <Alias Alias="String">i=12</Alias>
+        <Alias Alias="LocalizedText">i=21</Alias>
+        <Alias Alias="HasComponent">i=47</Alias>
+        <Alias Alias="HasProperty">i=46</Alias>
+        <Alias Alias="Organizes">i=35</Alias>
+        <Alias Alias="HasSubtype">i=45</Alias>
+        <Alias Alias="HasTypeDefinition">i=40</Alias>
+        <Alias Alias="HasDictionaryEntry">i=17597</Alias>
+    </Aliases>
+    <Extensions>
+        <Extension>
+            <si:Generator Product="SiOME" Edition="Standard" Version="3.0.3-installer"/>
+        </Extension>
+        <Extension>
+            <si:GeneratorExtension Hash="e13638f2284ae1d877c731d85a204c14"/>
+        </Extension>
+    </Extensions>
+    <UAObject SymbolicName="http___AAS" NodeId="ns=2;i=5000" BrowseName="2:http://AAS" ParentNodeId="i=11715">
+        <DisplayName>http://AAS</DisplayName>
+        <References>
+            <Reference ReferenceType="HasComponent" IsForward="false">i=11715</Reference>
+            <Reference ReferenceType="HasTypeDefinition">i=11616</Reference>
+        </References>
+    </UAObject>
+    <UAVariable DataType="Boolean" NodeId="ns=2;i=6000" BrowseName="IsNamespaceSubset" ParentNodeId="ns=2;i=5000">
+        <DisplayName>IsNamespaceSubset</DisplayName>
+        <References>
+            <Reference ReferenceType="HasProperty" IsForward="false">ns=2;i=5000</Reference>
+            <Reference ReferenceType="HasTypeDefinition">i=68</Reference>
+        </References>
+    </UAVariable>
+    <UAVariable DataType="DateTime" NodeId="ns=2;i=6001" BrowseName="NamespacePublicationDate" ParentNodeId="ns=2;i=5000">
+        <DisplayName>NamespacePublicationDate</DisplayName>
+        <References>
+            <Reference ReferenceType="HasProperty" IsForward="false">ns=2;i=5000</Reference>
+            <Reference ReferenceType="HasTypeDefinition">i=68</Reference>
+        </References>
+        <Value>
+            <uax:DateTime>2024-12-12T12:01:27+01:00</uax:DateTime>
+        </Value>
+    </UAVariable>
+    <UAVariable DataType="String" NodeId="ns=2;i=6002" BrowseName="NamespaceUri" ParentNodeId="ns=2;i=5000">
+        <DisplayName>NamespaceUri</DisplayName>
+        <References>
+            <Reference ReferenceType="HasProperty" IsForward="false">ns=2;i=5000</Reference>
+            <Reference ReferenceType="HasTypeDefinition">i=68</Reference>
+        </References>
+        <Value>
+            <uax:String>http://AAS</uax:String>
+        </Value>
+    </UAVariable>
+    <UAVariable DataType="String" NodeId="ns=2;i=6003" BrowseName="NamespaceVersion" ParentNodeId="ns=2;i=5000">
+        <DisplayName>NamespaceVersion</DisplayName>
+        <References>
+            <Reference ReferenceType="HasProperty" IsForward="false">ns=2;i=5000</Reference>
+            <Reference ReferenceType="HasTypeDefinition">i=68</Reference>
+        </References>
+        <Value>
+            <uax:String>1.00</uax:String>
+        </Value>
+    </UAVariable>
+    <UAVariable DataType="i=256" ValueRank="1" NodeId="ns=2;i=6004" BrowseName="StaticNodeIdTypes" ParentNodeId="ns=2;i=5000">
+        <DisplayName>StaticNodeIdTypes</DisplayName>
+        <References>
+            <Reference ReferenceType="HasProperty" IsForward="false">ns=2;i=5000</Reference>
+            <Reference ReferenceType="HasTypeDefinition">i=68</Reference>
+        </References>
+    </UAVariable>
+    <UAVariable DataType="i=291" ValueRank="1" NodeId="ns=2;i=6005" BrowseName="StaticNumericNodeIdRange" ParentNodeId="ns=2;i=5000">
+        <DisplayName>StaticNumericNodeIdRange</DisplayName>
+        <References>
+            <Reference ReferenceType="HasProperty" IsForward="false">ns=2;i=5000</Reference>
+            <Reference ReferenceType="HasTypeDefinition">i=68</Reference>
+        </References>
+    </UAVariable>
+    <UAVariable DataType="String" NodeId="ns=2;i=6006" BrowseName="StaticStringNodeIdPattern" ParentNodeId="ns=2;i=5000">
+        <DisplayName>StaticStringNodeIdPattern</DisplayName>
+        <References>
+            <Reference ReferenceType="HasProperty" IsForward="false">ns=2;i=5000</Reference>
+            <Reference ReferenceType="HasTypeDefinition">i=68</Reference>
+        </References>
+    </UAVariable>
+    <UAVariable DataType="i=96" ValueRank="1" NodeId="ns=2;i=6007" BrowseName="DefaultRolePermissions" ParentNodeId="ns=2;i=5000">
+        <DisplayName>DefaultRolePermissions</DisplayName>
+        <References>
+            <Reference ReferenceType="HasProperty" IsForward="false">ns=2;i=5000</Reference>
+            <Reference ReferenceType="HasTypeDefinition">i=68</Reference>
+        </References>
+    </UAVariable>
+    <UAVariable DataType="i=95" NodeId="ns=2;i=6008" BrowseName="DefaultAccessRestrictions" ParentNodeId="ns=2;i=5000">
+        <DisplayName>DefaultAccessRestrictions</DisplayName>
+        <References>
+            <Reference ReferenceType="HasProperty" IsForward="false">ns=2;i=5000</Reference>
+            <Reference ReferenceType="HasTypeDefinition">i=68</Reference>
+        </References>
+    </UAVariable>
+    <UAVariableType DataType="LocalizedText" NodeId="ns=2;i=2000" BrowseName="2:AASMultiLanguageProperty">
+        <DisplayName>AASMultiLanguageProperty</DisplayName>
+        <References>
+            <Reference ReferenceType="HasSubtype" IsForward="false">i=63</Reference>
+        </References>
+    </UAVariableType>
+    <UAVariableType NodeId="ns=2;i=2001" BrowseName="2:AASPropertyType">
+        <DisplayName>AASPropertyType</DisplayName>
+        <References>
+            <Reference ReferenceType="HasSubtype" IsForward="false">i=63</Reference>
+        </References>
+    </UAVariableType>
+    <UAObjectType NodeId="ns=2;i=1010" BrowseName="2:AASSubmodelElementCollectionType">
+        <DisplayName>AASSubmodelElementCollectionType</DisplayName>
+        <References>
+            <Reference ReferenceType="HasSubtype" IsForward="false">i=58</Reference>
+            <Reference ReferenceType="HasDictionaryEntry">i=17590</Reference>
+        </References>
+    </UAObjectType>
+    <UAObjectType NodeId="ns=2;i=1011" BrowseName="2:AASSubmodelElementListType">
+        <DisplayName>AASSubmodelElementListType</DisplayName>
+        <References>
+            <Reference ReferenceType="HasSubtype" IsForward="false">i=58</Reference>
+            <Reference ReferenceType="HasDictionaryEntry">i=17590</Reference>
+        </References>
+    </UAObjectType>
+    <UAObjectType NodeId="ns=2;i=1012" BrowseName="2:AASSubmodelType">
+        <DisplayName>AASSubmodelType</DisplayName>
+        <References>
+            <Reference ReferenceType="HasSubtype" IsForward="false">i=58</Reference>
+            <Reference ReferenceType="HasDictionaryEntry">i=17590</Reference>
+        </References>
+    </UAObjectType>
+    <UAReferenceType NodeId="ns=2;i=4000" BrowseName="2:Influences">
+        <DisplayName>Influences</DisplayName>
+        <References>
+            <Reference ReferenceType="HasSubtype" IsForward="false">i=32</Reference>
+        </References>
+        <InverseName>InfluencedBy</InverseName>
+    </UAReferenceType>
+    <UAObjectType NodeId="ns=2;i=1004" BrowseName="2:AASEnvironmentType">
+        <DisplayName>AASEnvironmentType</DisplayName>
+        <References>
+            <Reference ReferenceType="HasSubtype" IsForward="false">i=58</Reference>
+        </References>
+    </UAObjectType>
+    <UAObjectType NodeId="ns=2;i=1006" BrowseName="2:AssetAdministrationShellType">
+        <DisplayName>AssetAdministrationShellType</DisplayName>
+        <References>
+            <Reference ReferenceType="HasSubtype" IsForward="false">i=58</Reference>
+        </References>
+    </UAObjectType>
+    <UAObject NodeId="ns=2;i=5003" BrowseName="2:AASEnvironment" ParentNodeId="i=85">
+        <DisplayName>AASEnvironment</DisplayName>
+        <References>
+            <Reference ReferenceType="Organizes" IsForward="false">i=85</Reference>
+            <Reference ReferenceType="HasTypeDefinition">ns=2;i=1004</Reference>
+        </References>
+    </UAObject>
+    <UAObject NodeId="ns=2;i=5004" BrowseName="2:DriveAAS" ParentNodeId="ns=2;i=5003">
+        <DisplayName>DriveAAS</DisplayName>
+        <References>
+            <Reference ReferenceType="Organizes" IsForward="false">ns=2;i=5003</Reference>
+            <Reference ReferenceType="HasTypeDefinition">ns=2;i=1006</Reference>
+        </References>
+    </UAObject>
+    <UAObject NodeId="ns=2;i=5006" BrowseName="2:DriveCF" ParentNodeId="ns=2;i=5004">
+        <DisplayName>DriveCF</DisplayName>
+        <References>
+            <Reference ReferenceType="Organizes" IsForward="false">ns=2;i=5004</Reference>
+            <Reference ReferenceType="HasTypeDefinition">ns=1;i=1003</Reference>
+        </References>
+    </UAObject>
+    <UAObject NodeId="ns=2;i=5007" BrowseName="1:ProductCarbonFootprint" ParentNodeId="ns=2;i=5006">
+        <DisplayName>ProductCarbonFootprint</DisplayName>
+        <Description>Balance of greenhouse gas emissions along the entire life cycle of a product in a defined application and in relation to a defined unit of use</Description>
+        <References>
+            <Reference ReferenceType="HasComponent" IsForward="false">ns=2;i=5006</Reference>
+            <Reference ReferenceType="HasTypeDefinition">ns=1;i=1002</Reference>
+            <Reference ReferenceType="HasDictionaryEntry">ns=1;i=5008</Reference>
+        </References>
+    </UAObject>
+    <UAVariable DataType="Double" NodeId="ns=2;i=6010" BrowseName="1:PCFCO2eq" ParentNodeId="ns=2;i=5007" UserAccessLevel="3" AccessLevel="3">
+        <DisplayName>CO2 eq Climate Change</DisplayName>
+        <Description>Sum of all greenhouse gas emissions of a product according to the quantification requirements of the standard</Description>
+        <References>
+            <Reference ReferenceType="HasComponent" IsForward="false">ns=2;i=5007</Reference>
+            <Reference ReferenceType="HasTypeDefinition">ns=1;i=2000</Reference>
+            <Reference ReferenceType="HasDictionaryEntry">ns=1;i=5017</Reference>
+        </References>
+        <Value>
+            <uax:Double>0</uax:Double>
+        </Value>
+    </UAVariable>
+    <UAVariable DataType="Double" NodeId="ns=2;i=6011" BrowseName="1:PCFQuantityOfMeasureForCalculation" ParentNodeId="ns=2;i=5007" UserAccessLevel="3" AccessLevel="3">
+        <DisplayName>quantity of measure for calculation</DisplayName>
+        <Description>Quantity of the product to which the PCF information on the CO2 footprint refers</Description>
+        <References>
+            <Reference ReferenceType="HasComponent" IsForward="false">ns=2;i=5007</Reference>
+            <Reference ReferenceType="HasTypeDefinition">ns=1;i=2000</Reference>
+            <Reference ReferenceType="HasDictionaryEntry">ns=1;i=5019</Reference>
+        </References>
+        <Value>
+            <uax:Double>0</uax:Double>
+        </Value>
+    </UAVariable>
+    <UAVariable DataType="String" NodeId="ns=2;i=6012" BrowseName="1:PCFReferenceValueForCalculation" ParentNodeId="ns=2;i=5007" UserAccessLevel="3" AccessLevel="3">
+        <DisplayName>Reference value for calculation</DisplayName>
+        <Description>Quantity unit of the product to which the PCF information on the CO2 footprint refers</Description>
+        <References>
+            <Reference ReferenceType="HasComponent" IsForward="false">ns=2;i=5007</Reference>
+            <Reference ReferenceType="HasTypeDefinition">ns=1;i=2000</Reference>
+            <Reference ReferenceType="HasDictionaryEntry">ns=1;i=5018</Reference>
+        </References>
+    </UAVariable>
+    <UAVariable DataType="String" NodeId="ns=2;i=6013" BrowseName="1:PublicationDate" ParentNodeId="ns=2;i=5007" UserAccessLevel="3" AccessLevel="3">
+        <DisplayName>Publication date</DisplayName>
+        <Description>Time at which something was first published or made available</Description>
+        <References>
+            <Reference ReferenceType="HasComponent" IsForward="false">ns=2;i=5007</Reference>
+            <Reference ReferenceType="HasTypeDefinition">ns=1;i=2000</Reference>
+            <Reference ReferenceType="HasDictionaryEntry">ns=1;i=5028</Reference>
+        </References>
+    </UAVariable>
+    <UAVariable DataType="Boolean" NodeId="ns=2;i=6014" BrowseName="2:ProductMade" ParentNodeId="ns=2;i=5006" UserAccessLevel="3" AccessLevel="3">
+        <DisplayName>ProductMade</DisplayName>
+        <References>
+            <Reference ReferenceType="HasComponent" IsForward="false">ns=2;i=5006</Reference>
+            <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+        </References>
+        <Value>
+            <uax:Boolean>false</uax:Boolean>
+        </Value>
+    </UAVariable>
+</UANodeSet>

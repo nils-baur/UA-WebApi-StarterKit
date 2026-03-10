@@ -195,9 +195,13 @@ const AASTreeView: React.FC = () => {
     };
 
     const fetchValue = async (node: TreeNode) => {
-        if (!node.parentAASId || !node.parentSubmodelId || !node.path) return null;
+        if (!node.parentAASId || !node.parentSubmodelId || !node.path) {
+            console.log("fetchValue RETURN NULL");
+            return null;
+        }
         try {
             const result = await sendAASRequest(sessionRef.current, "GET", `/shells/${encodeId(node.parentAASId)}/submodels/${encodeId(node.parentSubmodelId)}/submodel-elements/${node.path}`);
+            console.log("fetchValue result:", result);
             return result?.value ?? result;
         } catch (e) {
             console.error("Polling error:", e);
@@ -205,7 +209,7 @@ const AASTreeView: React.FC = () => {
         }
     };
 
-    const registeredViaWebSocket = useRef<Set<string>>(new Set());
+    //const registeredViaWebSocket = useRef<Set<string>>(new Set());
 
     React.useEffect(() => {
         if (didRequestSubscription.current && subscriptionId) {
@@ -245,10 +249,12 @@ const AASTreeView: React.FC = () => {
         const infoUrl = `${url}/info`;
 
         const fetchAndUpdate = async () => {
+            console.log(`fetchAndUpdate node: ${node}`)
             const value = await fetchValue(node);
             setAccessViewItems(prev =>
                 prev.map(i => (i.id === node.id ? { ...i, value } : i))
             );
+            console.log(`fetchAndUpdate: ${value}`)
         };
 
         const updateItem = (patch: Partial<TreeNode>) => {
@@ -306,7 +312,6 @@ const AASTreeView: React.FC = () => {
                 }
 
                 // store info on the access view item (optional but useful)
-                
                 if (!existing) {
                     setAccessViewItems(prev => [
                         ...prev,
@@ -335,8 +340,8 @@ const AASTreeView: React.FC = () => {
             }
 
             // 3) Fetch once for value display and then keep polling
-            
             await fetchAndUpdate();
+
             /*
             const intervalId = window.setInterval(fetchAndUpdate, 3000);
             

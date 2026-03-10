@@ -406,7 +406,17 @@ namespace UaRestGateway.Server.Controllers
                     var submodelId = DecodeBase64Url(matchElem.Groups["submodelId"].Value);
                     var elementPath = matchElem.Groups["elementPath"].Value;
 
-                    var (element, isOpcUa, nodeId) = await m_aasCommunicationService.GetSubmodelElementInfoAsync(aasId, submodelId, elementPath).ConfigureAwait(false);
+                    Console.WriteLine($"Received request for elementPath: {elementPath}");
+
+                    var parentPathShort = elementPath;
+                    if (elementPath.Contains('/'))
+                    {
+                        var elementPathShort = elementPath.Split('/', 2);
+                        parentPathShort = elementPathShort[0];
+                        var childPathShort = elementPathShort[1];
+                    }
+
+                    var (element, isOpcUa, nodeId) = await m_aasCommunicationService.GetSubmodelElementInfoAsync(aasId, submodelId, parentPathShort).ConfigureAwait(false);
 
                     if (element == null)
                     {
@@ -452,7 +462,7 @@ namespace UaRestGateway.Server.Controllers
             outputJson["isOpcUa"] = output.IsOpcUa;
             if (output.IsOpcUa)
             {
-                outputJson["nodeId"] = output.IsOpcUa.ToString();
+                outputJson["nodeId"] = output.NodeId.ToString();
             }
 
             return new
