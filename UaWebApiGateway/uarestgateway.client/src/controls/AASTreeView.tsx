@@ -30,7 +30,7 @@ interface TreeNode {
 }
 
 type SubmodelElementInfoDto = {
-    submodelElement: any; 
+    submodelElement: any;
     isOpcUa: boolean;
     nodeId: string | null;
 };
@@ -56,7 +56,7 @@ const AASTreeView: React.FC = () => {
 
     const session = useContext(SessionContext);
     const sessionRef = useRef(session);
-    
+
     const {
         addNewMonitoredItem,
         removeMonitoredItem,
@@ -96,7 +96,7 @@ const AASTreeView: React.FC = () => {
         }));
     };
 
-    
+
     useEffect(() => {
         sessionRef.current = session;
     }, [session]);
@@ -134,7 +134,7 @@ const AASTreeView: React.FC = () => {
         return () => {
             // no built-in removeListener logic, but if you build it later, clean up here
         };
-    }, [session, session.messageCounter]); // 
+    }, [session, session.messageCounter]);
 
 
 
@@ -171,7 +171,6 @@ const AASTreeView: React.FC = () => {
     };
 
     const elementToTree = async (element: aas.types.ISubmodelElement, aasId: string, submodelId: string, idShort: string, parentPath: string): Promise<TreeNode> => {
-        //const label = `${getSubmodelElementAbbreviation(element.constructor.name)}: ${element.idShort}`;
         const label = `${getSubmodelElementAbbreviation(element)}: ${element.idShort}`;
         const currentPath = parentPath ? `${parentPath}.${idShort}` : idShort;
         const children: TreeNode[] = [];
@@ -194,22 +193,48 @@ const AASTreeView: React.FC = () => {
         };
     };
 
+    // FIX: Robustly unwrap the scalar value from any response shape.
+    //
+    // The AAS submodel-element endpoint can return different shapes depending
+    // on the transport layer:
+    //
+    //   REST shape:      { idShort: "PCFCO2eq", modelType: "Property", value: 3.55 }
+    //   WebSocket shape: { submodelElement: { idShort: "PCFCO2eq", value: 3.55 }, isOpcUa: true, nodeId: "..." }
+    //                    (backend returns the /info DTO shape instead of the bare element)
+    //
+    // Previously `result?.value ?? result` worked for REST but for WebSocket it
+    // picked up the full `submodelElement` object as the value, causing the
+    // access view to render the entire serialized object instead of the scalar.
     const fetchValue = async (node: TreeNode) => {
         if (!node.parentAASId || !node.parentSubmodelId || !node.path) {
             console.log("fetchValue RETURN NULL");
             return null;
         }
         try {
-            const result = await sendAASRequest(sessionRef.current, "GET", `/shells/${encodeId(node.parentAASId)}/submodels/${encodeId(node.parentSubmodelId)}/submodel-elements/${node.path}`);
+            const result = await sendAASRequest(
+                sessionRef.current,
+                "GET",
+                `/shells/${encodeId(node.parentAASId)}/submodels/${encodeId(node.parentSubmodelId)}/submodel-elements/${node.path}`
+            );
             console.log("fetchValue result:", result);
-            return result?.value ?? result;
+
+            // WebSocket path: backend wraps the element in { submodelElement: { value: X }, ... }
+            if (result?.submodelElement !== undefined) {
+                const inner = result.submodelElement;
+                return inner?.value ?? inner;
+            }
+
+            // REST path: bare element { ..., value: X }
+            if (result?.value !== undefined) {
+                return result.value;
+            }
+
+            return result;
         } catch (e) {
             console.error("Polling error:", e);
             return null;
         }
     };
-
-    //const registeredViaWebSocket = useRef<Set<string>>(new Set());
 
     React.useEffect(() => {
         if (didRequestSubscription.current && subscriptionId) {
@@ -249,12 +274,12 @@ const AASTreeView: React.FC = () => {
         const infoUrl = `${url}/info`;
 
         const fetchAndUpdate = async () => {
-            console.log(`fetchAndUpdate node: ${node}`)
+            console.log(`fetchAndUpdate node: ${node.name}`);
             const value = await fetchValue(node);
             setAccessViewItems(prev =>
                 prev.map(i => (i.id === node.id ? { ...i, value } : i))
             );
-            console.log(`fetchAndUpdate: ${value}`)
+            console.log(`fetchAndUpdate value:`, value);
         };
 
         const updateItem = (patch: Partial<TreeNode>) => {
@@ -273,7 +298,6 @@ const AASTreeView: React.FC = () => {
 
             // 1) Call infoUrl once to get IsOpcUa + NodeId (+ element)
             let isOpcUa = false;
-            
             let returnedElement: any = null;
 
             try {
@@ -286,7 +310,7 @@ const AASTreeView: React.FC = () => {
                 if (typeof nodeId === "string" && nodeId.length > 0) {
                     mySubscriptionContext.mappedNodeIDs.push({ nodeId, itemId: monitoredItemId.current });
                 }
-                console.log(`[AAS] NodeId: ${isOpcUa} ${mappedNodeId}`)
+                console.log(`[AAS] isOpcUa: ${isOpcUa}, nodeId: ${nodeId}`);
 
                 if (mySubscriptionContext.subscriptionID == -1 && isOpcUa) {
                     if (typeof createSubscription === "function") {
@@ -301,7 +325,7 @@ const AASTreeView: React.FC = () => {
                         didRequestSubscription.current = true;
                     }
                 }
-                else if (mySubscriptionContext.subscriptionID != -1 && isOpcUa){
+                else if (mySubscriptionContext.subscriptionID != -1 && isOpcUa) {
                     const items: IMonitoredItem[] = [];
                     items.push({
                         nodeId: mySubscriptionContext.mappedNodeIDs[mySubscriptionContext.mappedNodeIDs.length - 1].nodeId,
@@ -311,25 +335,25 @@ const AASTreeView: React.FC = () => {
                     monitoredItemId.current++;
                 }
 
-                // store info on the access view item (optional but useful)
+                // Store info on the access view item.
+                // Note: we do NOT set `original` to returnedElement here, because
+                // the access view render falls back to `original.value` if `item.value`
+                // is not yet set. Setting original to the full info DTO would cause
+                // the serialized object to briefly flash before fetchAndUpdate completes.
                 if (!existing) {
                     setAccessViewItems(prev => [
                         ...prev,
                         {
                             ...node,
                             isOpcUa,
-                            mappedNodeId,
-                            ...(returnedElement ? { original: returnedElement } : {})
+                            // Keep original as the typed AAS element from the tree,
+                            // not the raw DTO, so idShort resolves correctly.
                         }
                     ]);
                 } else {
-                    updateItem({
-                        isOpcUa,
-                        mappedNodeId,
-                        ...(returnedElement ? { original: returnedElement } : {})
-                    });
+                    updateItem({ isOpcUa });
                 }
-                
+
             } catch (err) {
                 console.error("Failed to load info from infoUrl:", err);
 
@@ -339,17 +363,9 @@ const AASTreeView: React.FC = () => {
                 }
             }
 
-            // 3) Fetch once for value display and then keep polling
+            // 2) Fetch once for initial value display
             await fetchAndUpdate();
 
-            /*
-            const intervalId = window.setInterval(fetchAndUpdate, 3000);
-            
-            // attach poll interval id
-            setAccessViewItems(prev =>
-                prev.map(i => (i.id === node.id ? { ...i, pollIntervalId: intervalId } : i))
-            );
-            */
             handleCloseContextMenu();
         };
 
@@ -399,6 +415,9 @@ const AASTreeView: React.FC = () => {
         setAccessViewContextMenu(null);
     };
 
+    // FIX: Prioritise item.value (set by fetchAndUpdate / subscription push) over
+    // original.value so that a scalar fetched via WebSocket is shown rather than
+    // whatever the tree-node's `original` object carries.
     const renderValue = (val: any): string => {
         if (val == null) return "";
         if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") return val.toString();
@@ -419,7 +438,7 @@ const AASTreeView: React.FC = () => {
         } else if (node.type === "Submodel") {
             const shellId = node.parentAASId!;
             const submodelId = (node.original && 'id' in node.original) ? (node.original as { id: string }).id : undefined;
-            if (!submodelId) return; // <-- Add this guard
+            if (!submodelId) return;
             const smJson = await sendAASRequest(sessionRef.current, "GET", `/shells/${encodeId(shellId)}/submodels/${encodeId(submodelId)}`);
             const sm = aas.jsonization.submodelFromJsonable(smJson).mustValue();
             const updatedNode = await submodelToTree(sm, shellId);
@@ -454,7 +473,15 @@ const AASTreeView: React.FC = () => {
                         {accessViewItems.map((item, idx) => {
                             const original = item.original as aas.types.Class;
                             const idShort = (original as any)?.idShort ?? item.name;
-                            const value = item.value ?? (original as any)?.value ?? null;
+
+                            // FIX: item.value is set explicitly by fetchAndUpdate and subscription
+                            // push updates and always holds the unwrapped scalar. Only fall back
+                            // to original.value if item.value has never been set (undefined), NOT
+                            // when it is null/0/false (which are valid scalar values).
+                            const value = item.value !== undefined
+                                ? item.value
+                                : (original as any)?.value ?? null;
+
                             return (
                                 <tr key={idx}
                                     onContextMenu={(e) => handleAccessViewContextMenu(e, idx)}
@@ -582,7 +609,6 @@ function getSubmodelElementAbbreviation(el: aas.types.ISubmodelElement): string 
 }
 
 function generateUUIDv4(): string {
-    // Generates a random UUID v4 string
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         const r = Math.random() * 16 | 0;
         const v = c === 'x' ? r : (r & 0x3 | 0x8);

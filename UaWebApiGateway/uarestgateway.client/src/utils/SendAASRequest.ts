@@ -28,10 +28,9 @@ export async function sendAASRequest<T = any>(
     };
 
     if (session.isConnected && typeof session.sendRequest === "function") {
-        console.log(`[AAS] WS sending: ${method} ${path}`);
-        session.sendRequest(message, requestHandle);
-
-        // Poll lastCompletedRequest until we get a matching response
+        // FIX: Register the listener BEFORE sending to avoid a race condition
+        // where the response arrives before the listener is attached.
+        // Also removed the duplicate sendRequest call that was outside the Promise.
         return new Promise<T>((resolve, reject) => {
             session.addAASResponseListener?.(requestHandle, (response) => {
                 const result = response.Body?.Result;
