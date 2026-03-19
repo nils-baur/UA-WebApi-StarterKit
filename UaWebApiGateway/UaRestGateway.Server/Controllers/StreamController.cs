@@ -428,20 +428,6 @@ namespace UaRestGateway.Server.Controllers
                     var response = CreateAASResponse(requestHandle, path, output);
                     await SendJson(webSocket, response);
                     return;
-
-                    //if (isOpcUa && element is Property prop)
-                    //{
-                    //    var sessionKey = sessionContext.ChannelContext.SecureChannelId;
-                    //    //m_streamLogger.LogInformation($"Subscription count: {_subscriptions.Count}");
-                    //    SetupOpcUaSubscription(sessionKey, nodeId, Client, prop, elementPath, requestHandle, webSocket);
-                    //    return; // async updates will be sent as data arrives
-                    //}
-                    //else
-                    //{
-                    //    var response = CreateAASResponse(requestHandle, path, element);
-                    //    await SendJson(webSocket, response);
-                    //    return;
-                    //}
                 }
 
                 // Fallback: unknown path
@@ -455,6 +441,7 @@ namespace UaRestGateway.Server.Controllers
             }
         }
 
+        //Create AAS response in case of OPC UA Backed element
         private object CreateAASResponse(int requestHandle, string path, SubmodelElementInfo output)
         {
             var outputJson = new JsonObject();
@@ -477,6 +464,7 @@ namespace UaRestGateway.Server.Controllers
             };
         }
 
+        //Create AAS Response
         private object CreateAASResponse(int requestHandle, string path, IClass result)
         {
             return new
@@ -496,104 +484,6 @@ namespace UaRestGateway.Server.Controllers
             var jsonResponse = JsonSerializer.Serialize(obj);
             var buffer = Encoding.UTF8.GetBytes(jsonResponse);
             await socket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
-        }
-
-
-
-        public void SetupOpcUaSubscription(string sessionId, NodeId nodeId, UAClient client, Property element, string elementPath, int requestHandle, WebSocket socket)
-        {
-            var key = (sessionId, nodeId);
-            if (_subscriptions.TryGetValue(key, out var existing))
-            {
-                // Just update the socket if subscription already exists
-                existing.Socket = socket;
-                return;
-            }
-
-
-            var session = client.Session;
-
-            // Create subscription if needed
-            var subscription = session.DefaultSubscription ?? new Opc.Ua.Client.Subscription(client.Session.DefaultSubscription)
-            {
-                PublishingInterval = 1000,
-                DisplayName = "WebSocketUpdates",
-                PublishingEnabled = true
-            };
-
-            if (session.DefaultSubscription == null)
-            {
-                session.AddSubscription(subscription);
-                subscription.Create();
-            }
-
-            var item = new Opc.Ua.Client.MonitoredItem
-            {
-                DisplayName = $"{sessionId}-{nodeId}",
-                StartNodeId = nodeId,
-                AttributeId = Opc.Ua.Attributes.Value,
-                SamplingInterval = 1000,
-                QueueSize = 1,
-                DiscardOldest = true
-            };
-
-            item.Notification += async (monItem, args) =>
-            {
-                if (args.NotificationValue is MonitoredItemNotification notification)
-                {
-                    var value = notification.Value?.Value;
-                    m_streamLogger.LogDebug($"Received update for {nodeId}: {value}");
-
-                    var currentKey = _subscriptions.FirstOrDefault(kvp => kvp.Value.Item == monItem).Key;
-
-                    if (currentKey != default && _subscriptions.TryGetValue(currentKey, out var holder))
-                    {
-                        if (holder.Socket?.State == WebSocketState.Open)
-                        {
-                            element.Value = value?.ToString();
-
-                            var data = new
-                            {
-                                ServiceId = "AASResponse",
-                                Body = new
-                                {
-                                    RequestHeader = new { AASRequestHandle = requestHandle },
-                                    Path = elementPath,
-                                    Result = Jsonization.Serialize.ToJsonObject(element)
-                                }
-                            };
-
-                            var json = JsonSerializer.Serialize(data);
-                            var buffer = Encoding.UTF8.GetBytes(json);
-
-                            await holder.Socket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
-                        }
-                        else
-                        {
-                            m_streamLogger.LogWarning($"Socket closed for session {holder.SessionId}. Removing subscription.");
-                            monItem?.Subscription?.Delete(true);
-                            _subscriptions.Remove(currentKey);
-                        }
-                    }
-                    else
-                    {
-                        m_streamLogger.LogWarning($"Stale or missing subscription for monitored item {monItem.DisplayName}. Ignoring update.");
-                    }
-                }
-            };
-
-            subscription.AddItem(item);
-            client.Session.AddSubscription(subscription);
-            subscription.Create();
-            subscription.ApplyChanges();
-
-            _subscriptions[key] = new SubscriptionHolder
-            {
-                Item = item,
-                Socket = socket,
-                SessionId = sessionId
-            };
-
         }
 
         private async Task SendError(WebSocket socket, int requestHandle, string message)

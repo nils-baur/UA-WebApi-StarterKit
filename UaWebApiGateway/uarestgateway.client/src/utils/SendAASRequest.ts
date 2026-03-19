@@ -1,8 +1,17 @@
-﻿// SendAASRequest.ts
-import { IRequestMessage } from "../service/IRequestMessage";
+﻿import { IRequestMessage } from "../service/IRequestMessage";
 import { HandleFactory } from "../service/HandleFactory";
 import { SessionContext } from "../SessionContext";
 
+/**
+ * Sends an AAS API request over the active WebSocket session when connected,
+ * falling back to a direct REST call when the WebSocket is unavailable.
+ *
+ * @param session  - The current session context providing transport and state.
+ * @param method   - HTTP method to use.
+ * @param path     - AAS API path relative to /api/v3.0 (e.g. "/shells").
+ * @param body     - Optional request body for POST/PUT requests.
+ * @returns        The parsed response body typed as T.
+ */
 export async function sendAASRequest<T = any>(
     session: React.ContextType<typeof SessionContext>,
     method: "GET" | "POST" | "PUT" | "DELETE",
@@ -11,6 +20,7 @@ export async function sendAASRequest<T = any>(
 ): Promise<T> {
     const requestHandle = HandleFactory.increment();
 
+    // Set a default WebSocket URL derived from the current host if none is configured.
     const defaultAASServerUrl = `ws://${location.host}/stream`;
     if (!session.serverUrl && session.setServerUrl) {
         console.log(`[AAS] Setting default WebSocket URL: ${defaultAASServerUrl}`);
@@ -28,9 +38,8 @@ export async function sendAASRequest<T = any>(
     };
 
     if (session.isConnected && typeof session.sendRequest === "function") {
-        // FIX: Register the listener BEFORE sending to avoid a race condition
-        // where the response arrives before the listener is attached.
-        // Also removed the duplicate sendRequest call that was outside the Promise.
+        // Listener is registered before sending to avoid a race condition where
+        // the response could arrive before the handler is attached.
         return new Promise<T>((resolve, reject) => {
             session.addAASResponseListener?.(requestHandle, (response) => {
                 const result = response.Body?.Result;
@@ -46,7 +55,7 @@ export async function sendAASRequest<T = any>(
         });
     }
 
-    // REST fallback
+    // WebSocket not available — fall back to direct REST.
     console.log(`[AAS] REST fallback: ${method} ${path}`);
     const res = await fetch(`/api/v3.0${path}`, {
         method,

@@ -10,40 +10,46 @@ import { sendAASRequest } from "../utils/SendAASRequest";
 
 import { IMonitoredItem } from '../SubscriptionProvider';
 import { SubscriptionContext } from '../SubscriptionContext';
-import { createSubscriptionAPI, addMonitoredItemAPI, deleteSubscriptionAPI, removeMonitoredItemsAPI, removeMonitoredItemAPI } from '../SubscriptionAPI';
+// removeMonitoredItemsAPI (bulk) is intentionally omitted — only single-item removal is used here.
+import { createSubscriptionAPI, addMonitoredItemAPI, deleteSubscriptionAPI, removeMonitoredItemAPI } from '../SubscriptionAPI';
 
 import * as OpcUa from 'opcua-webapi';
 
+/** Internal representation of a node in the AAS tree. */
 interface TreeNode {
     id: string;
     name: string;
     type: string;
     children?: TreeNode[];
+    /** The original AAS SDK object, used for the detail panel. */
     original: aas.types.Class | null;
     parentAASId?: string;
     parentSubmodelId?: string;
+    /** Dot-separated idShort path, e.g. "ProductCarbonFootprint.PCFCO2eq". */
     path?: string;
     pollIntervalId?: number;
+    /** Current display value; set by fetchValue or an OPC UA subscription push. */
     value?: any;
+    /** True when the element is backed by an OPC UA node. */
     isOpcUa?: boolean;
-    nodeId?: string | null;
 }
 
-type SubmodelElementInfoDto = {
-    submodelElement: any;
-    isOpcUa: boolean;
-    nodeId: string | null;
-};
-
-type mappedIds = {
+/** Tracks a monitored item's OPC UA node ID and its subscription item ID. */
+type MappedIds = {
     nodeId: string;
     itemId: number;
 };
+
+/**
+ * Module-level subscription state shared between the component and the
+ * subscription API helpers. Kept outside React state to avoid re-renders
+ * on subscription lifecycle changes.
+ */
 export const mySubscriptionContext = {
     subscriptionID: -1,
     publishCB: null,
-    publishCtx: {}, // or your context value
-    mappedNodeIDs: [] as mappedIds[], // to track nodeIds for monitored items
+    publishCtx: {},
+    mappedNodeIDs: [] as MappedIds[],
 };
 
 
@@ -55,6 +61,8 @@ const AASTreeView: React.FC = () => {
     const [accessViewContextMenu, setAccessViewContextMenu] = useState<{ mouseX: number; mouseY: number; index: number } | null>(null);
 
     const session = useContext(SessionContext);
+    // Ref keeps the latest session available inside async callbacks without
+    // requiring them to be re-created on every session change.
     const sessionRef = useRef(session);
 
     const {
@@ -67,8 +75,12 @@ const AASTreeView: React.FC = () => {
 
     const monitoredItemId = React.useRef(1);
     const didRequestSubscription = React.useRef(false);
-    const mappedNodeId = React.useRef<string[]>([]);
 
+    /**
+     * Called by the SubscriptionProvider on each OPC UA publish cycle.
+     * Matches incoming DataChangeNotification values to access-view items
+     * by node ID and updates their displayed value.
+     */
     const handlePublish = (
         data: any,
         monitoredItems: Map<number, IMonitoredItem>) => {
@@ -96,11 +108,12 @@ const AASTreeView: React.FC = () => {
         }));
     };
 
-
+    // Keep sessionRef in sync so async callbacks always see the latest session.
     useEffect(() => {
         sessionRef.current = session;
     }, [session]);
 
+    // Load the AAS tree once on mount and clean up any active poll intervals on unmount.
     useEffect(() => {
         loadTree();
         return () => {
@@ -110,6 +123,11 @@ const AASTreeView: React.FC = () => {
         };
     }, []);
 
+    /**
+     * Listens for server-push value updates over the WebSocket session.
+     * When the server pushes a new value for a known path, the corresponding
+     * access-view item is updated in place.
+     */
     useEffect(() => {
         const session = sessionRef.current;
         const listener = (response: IResponseMessage) => {
@@ -132,13 +150,11 @@ const AASTreeView: React.FC = () => {
         }
 
         return () => {
-            // no built-in removeListener logic, but if you build it later, clean up here
+            // TODO: unregister listener when removeListener is available on the session.
         };
     }, [session, session.messageCounter]);
 
-
-
-
+    /** Fetches all shells and their submodels and builds the tree state. */
     const loadTree = async () => {
         const shellJson = await sendAASRequest(sessionRef.current, "GET", "/shells");
         const shell = aas.jsonization.assetAdministrationShellFromJsonable(shellJson).mustValue();
@@ -154,6 +170,7 @@ const AASTreeView: React.FC = () => {
         setTreeData({ id: shell.id, name: `AAS: ${shell.idShort}`, type: "AssetAdministrationShell", original: shell, children });
     };
 
+    /** Converts a Submodel into a TreeNode, recursively processing its elements. */
     const submodelToTree = async (submodel: aas.types.Submodel, aasId: string): Promise<TreeNode> => {
         const children: TreeNode[] = [];
         for (const el of submodel.submodelElements ?? []) {
@@ -170,6 +187,7 @@ const AASTreeView: React.FC = () => {
         };
     };
 
+    /** Recursively converts a SubmodelElement into a TreeNode. */
     const elementToTree = async (element: aas.types.ISubmodelElement, aasId: string, submodelId: string, idShort: string, parentPath: string): Promise<TreeNode> => {
         const label = `${getSubmodelElementAbbreviation(element)}: ${element.idShort}`;
         const currentPath = parentPath ? `${parentPath}.${idShort}` : idShort;
@@ -193,18 +211,17 @@ const AASTreeView: React.FC = () => {
         };
     };
 
-    // FIX: Robustly unwrap the scalar value from any response shape.
-    //
-    // The AAS submodel-element endpoint can return different shapes depending
-    // on the transport layer:
-    //
-    //   REST shape:      { idShort: "PCFCO2eq", modelType: "Property", value: 3.55 }
-    //   WebSocket shape: { submodelElement: { idShort: "PCFCO2eq", value: 3.55 }, isOpcUa: true, nodeId: "..." }
-    //                    (backend returns the /info DTO shape instead of the bare element)
-    //
-    // Previously `result?.value ?? result` worked for REST but for WebSocket it
-    // picked up the full `submodelElement` object as the value, causing the
-    // access view to render the entire serialized object instead of the scalar.
+    /**
+     * Fetches the current value of a submodel element via the AAS API.
+     *
+     * The submodel-element endpoint returns different response shapes depending
+     * on the active transport:
+     *  - REST:      bare element object  { idShort, modelType, value, ... }
+     *  - WebSocket: info DTO             { submodelElement: { value, ... }, isOpcUa, nodeId }
+     *
+     * In both cases only the scalar `value` field is returned. A `null` value is
+     * returned as-is; the whole element object is never returned.
+     */
     const fetchValue = async (node: TreeNode) => {
         if (!node.parentAASId || !node.parentSubmodelId || !node.path) {
             console.log("fetchValue RETURN NULL");
@@ -218,24 +235,31 @@ const AASTreeView: React.FC = () => {
             );
             console.log("fetchValue result:", result);
 
-            // WebSocket path: backend wraps the element in { submodelElement: { value: X }, ... }
+            // WebSocket transport: result is the /info DTO shape.
             if (result?.submodelElement !== undefined) {
                 const inner = result.submodelElement;
-                return inner?.value ?? inner;
+                // Explicit undefined check so a legitimate null value is not
+                // mistaken for a missing value and does not fall back to the object.
+                return inner?.value !== undefined ? inner.value : null;
             }
 
-            // REST path: bare element { ..., value: X }
-            if (result?.value !== undefined) {
+            // REST transport: result is the bare element object.
+            // Use 'in' to distinguish a present-but-null value from a missing key.
+            if (result !== null && typeof result === 'object' && 'value' in result) {
                 return result.value;
             }
 
-            return result;
+            return null;
         } catch (e) {
             console.error("Polling error:", e);
             return null;
         }
     };
 
+    /**
+     * Once a subscription is confirmed (subscriptionId becomes available),
+     * register the pending monitored item against the new subscription.
+     */
     React.useEffect(() => {
         if (didRequestSubscription.current && subscriptionId) {
             mySubscriptionContext.subscriptionID = subscriptionId;
@@ -246,21 +270,32 @@ const AASTreeView: React.FC = () => {
             addMonitoredItemAPI(addNewMonitoredItem, items, mySubscriptionContext);
             mySubscriptionContext.mappedNodeIDs[0].itemId = monitoredItemId.current;
             monitoredItemId.current++;
-            didRequestSubscription.current = false; // Reset the flag
+            didRequestSubscription.current = false;
         }
     }, [subscriptionId]);
 
+    /**
+     * Response shape of the /submodel-elements/{path}/info endpoint.
+     * PascalCase variants are included to handle different backend serialisers.
+     */
     type SubmodelElementInfoDto = {
         submodelElement?: any;
         isOpcUa?: boolean;
         nodeId?: string | null;
-
-        // fallback (PascalCase)
         SubmodelElement?: any;
         IsOpcUa?: boolean;
         NodeId?: string | null;
     };
 
+    /**
+     * Adds a submodel element to the Access View panel.
+     *
+     * Flow:
+     *  1. Call /info to determine isOpcUa, nodeId, and the element shape.
+     *  2. If OPC UA-backed, create or extend the active subscription.
+     *  3. Fetch the current value via fetchValue and display it immediately.
+     *     For OPC UA-backed elements, handlePublish will keep the value live.
+     */
     const handleOnAddAccessView = useCallback(() => {
         if (!contextMenu?.node) return;
 
@@ -289,21 +324,17 @@ const AASTreeView: React.FC = () => {
         };
 
         const run = async () => {
-            // If the item already exists in access view, cancel its poll
             const existing = accessViewItems.find(i => i.id === node.id);
             if (existing?.pollIntervalId) {
                 clearInterval(existing.pollIntervalId);
                 updateItem({ pollIntervalId: undefined });
             }
 
-            // 1) Call infoUrl once to get IsOpcUa + NodeId (+ element)
             let isOpcUa = false;
-            let returnedElement: any = null;
 
             try {
                 const info: SubmodelElementInfoDto = await sendAASRequest(session, "GET", infoUrl);
 
-                returnedElement = info.submodelElement ?? info.SubmodelElement ?? null;
                 isOpcUa = (info.isOpcUa ?? info.IsOpcUa) ?? false;
 
                 const nodeId = info.nodeId ?? info.NodeId;
@@ -335,37 +366,22 @@ const AASTreeView: React.FC = () => {
                     monitoredItemId.current++;
                 }
 
-                // Store info on the access view item.
-                // Note: we do NOT set `original` to returnedElement here, because
-                // the access view render falls back to `original.value` if `item.value`
-                // is not yet set. Setting original to the full info DTO would cause
-                // the serialized object to briefly flash before fetchAndUpdate completes.
+                // `original` intentionally keeps the typed AAS element from the tree
+                // rather than the raw DTO so that idShort resolves correctly in the render.
                 if (!existing) {
-                    setAccessViewItems(prev => [
-                        ...prev,
-                        {
-                            ...node,
-                            isOpcUa,
-                            // Keep original as the typed AAS element from the tree,
-                            // not the raw DTO, so idShort resolves correctly.
-                        }
-                    ]);
+                    setAccessViewItems(prev => [...prev, { ...node, isOpcUa }]);
                 } else {
                     updateItem({ isOpcUa });
                 }
 
             } catch (err) {
                 console.error("Failed to load info from infoUrl:", err);
-
-                // still ensure item exists
                 if (!existing) {
                     setAccessViewItems(prev => [...prev, { ...node }]);
                 }
             }
 
-            // 2) Fetch once for initial value display
             await fetchAndUpdate();
-
             handleCloseContextMenu();
         };
 
@@ -384,6 +400,7 @@ const AASTreeView: React.FC = () => {
         setAccessViewContextMenu({ mouseX: event.clientX + 2, mouseY: event.clientY + 2, index });
     };
 
+    /** Removes an item from the Access View and cleans up its subscription if OPC UA-backed. */
     const handleRemoveAccessViewItem = (index: number) => {
         const item = accessViewItems[index];
         if (item.isOpcUa) {
@@ -396,8 +413,7 @@ const AASTreeView: React.FC = () => {
             });
 
             removeMonitoredItemAPI(removeMonitoredItem, itemToRemove, index, mySubscriptionContext);
-
-            mySubscriptionContext.mappedNodeIDs.splice(index, 1); // remove the mapped nodeId at the current iteration index   
+            mySubscriptionContext.mappedNodeIDs.splice(index, 1);
         }
 
         if (typeof createSubscription === "function" && mySubscriptionContext.mappedNodeIDs.length == 0 && mySubscriptionContext.subscriptionID != -1) {
@@ -415,9 +431,10 @@ const AASTreeView: React.FC = () => {
         setAccessViewContextMenu(null);
     };
 
-    // FIX: Prioritise item.value (set by fetchAndUpdate / subscription push) over
-    // original.value so that a scalar fetched via WebSocket is shown rather than
-    // whatever the tree-node's `original` object carries.
+    /**
+     * Formats a value for display in the Access View table.
+     * Handles primitives, MultiLanguageProperty arrays, and falls back to JSON.
+     */
     const renderValue = (val: any): string => {
         if (val == null) return "";
         if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") return val.toString();
@@ -431,10 +448,10 @@ const AASTreeView: React.FC = () => {
         }
     };
 
-
+    /** Re-fetches the clicked node: full tree for AAS root, single submodel for submodel nodes. */
     const refreshTreeNode = async (node: TreeNode) => {
         if (node.type === "AssetAdministrationShell") {
-            await loadTree(); // refresh entire tree
+            await loadTree();
         } else if (node.type === "Submodel") {
             const shellId = node.parentAASId!;
             const submodelId = (node.original && 'id' in node.original) ? (node.original as { id: string }).id : undefined;
@@ -443,7 +460,6 @@ const AASTreeView: React.FC = () => {
             const sm = aas.jsonization.submodelFromJsonable(smJson).mustValue();
             const updatedNode = await submodelToTree(sm, shellId);
 
-            // Replace this submodel in the treeData
             setTreeData(prev => {
                 if (!prev) return prev;
                 return {
@@ -458,14 +474,17 @@ const AASTreeView: React.FC = () => {
 
     return (
         <div style={{ display: "flex", height: "80vh", width: "100%" }}>
+            {/* Tree panel */}
             <div style={{ width: "33%", overflow: "auto", borderRight: "1px solid #ccc" }}>
                 <TreeView defaultCollapseIcon={<ExpandMoreIcon />} defaultExpandIcon={<ChevronRightIcon />}>
                     {treeData && renderTree(treeData)}
                 </TreeView>
             </div>
+            {/* Detail panel — shows raw properties of the selected node */}
             <div style={{ width: "33%", overflow: "auto", borderRight: "1px solid #ccc", padding: "0 8px" }}>
                 {renderDetails()}
             </div>
+            {/* Access View panel — shows live values of pinned elements */}
             <div style={{ width: "34%", overflow: "auto", padding: "0 8px" }}>
                 <table style={{ width: "100%", tableLayout: "fixed" }}>
                     <thead><tr><th style={thStyle}>Name (idShort)</th><th style={thStyle}>Value</th></tr></thead>
@@ -474,10 +493,9 @@ const AASTreeView: React.FC = () => {
                             const original = item.original as aas.types.Class;
                             const idShort = (original as any)?.idShort ?? item.name;
 
-                            // FIX: item.value is set explicitly by fetchAndUpdate and subscription
-                            // push updates and always holds the unwrapped scalar. Only fall back
-                            // to original.value if item.value has never been set (undefined), NOT
-                            // when it is null/0/false (which are valid scalar values).
+                            // Prefer item.value (set by fetchValue or a subscription push) over
+                            // original.value. The !== undefined guard ensures valid falsy values
+                            // such as 0 or false are not incorrectly skipped.
                             const value = item.value !== undefined
                                 ? item.value
                                 : (original as any)?.value ?? null;
@@ -567,10 +585,15 @@ const tdStyle: React.CSSProperties = {
     overflow: "auto",
 };
 
+/** Encodes an AAS identifier to URL-safe Base64 as required by the AAS API spec. */
 function encodeId(id: string): string {
     return btoa(id).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
+/**
+ * Returns the short-form type label for a SubmodelElement (e.g. "Prop", "SMC").
+ * Used as a prefix in tree node labels.
+ */
 function getSubmodelElementAbbreviation(el: aas.types.ISubmodelElement): string {
     const dbg = {
         modelType: (el as any).modelType,
@@ -608,6 +631,7 @@ function getSubmodelElementAbbreviation(el: aas.types.ISubmodelElement): string 
     return "unnamed";
 }
 
+/** Generates a random UUID v4 string. */
 function generateUUIDv4(): string {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         const r = Math.random() * 16 | 0;
