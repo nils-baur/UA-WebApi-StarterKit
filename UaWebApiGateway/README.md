@@ -62,21 +62,21 @@ The OPC UA view is build like the UAExpert.
 This means, on the left side, you can find the OPC UA information model tree, which you can browse through with clicking on the different nodes.
 While browsing in the property view on the far right side, the information of the node you selected is shown.
 
-![Browse OPC](../images/browse_opc_tree.png)
+![Browse OPC](../images/browse_opc_tree.jpg)
 
 
 Different to the UAExpert, to add a node to the access view which is the middle element, you need to right click the wanted node or make a double click on it. Drag and Drop is not supported.
 A new popup window will appeare which needs to be clicked. With this the node will be added to the access view and a subscription is created if non exists already.
 
-![Add OPC UA node](../images/add_opc.png)
+![Add OPC UA node](../images/add_opc.jpg)
 
 NOTE:
 * Only variables are supported for the access view. 
 * A subscription will not run automaticly. To start the subscription, the button *Subscription* in the banner menu needs to be pressed.
 
-To remove a element from the access view, you need to right click or double click the node inside the access view and press the button in the new popup window.
+To remove a element from the access view, you need to click the node inside the access view and the element will be deleted.
 
-![Remove OPC UA element](../images/remove_opc.png)
+![Remove OPC UA element](../images/remove_opc.jpg)
 
 ### AAS
 
@@ -84,19 +84,19 @@ The AAS view has a similar handling as the OPC UA view. It is devided into 3 dif
 On the left side you can find the AAS tree view, which you can browse through clicking on the wanted element.
 While browsing in the property view in the middle, the information of the selected element is shown.
 
-![Browse AAS](../images/browse_aas_tree.png)
+![Browse AAS](../images/browse_aas_tree.jpg)
 
 To add a node to the access view which is on the far right, you need to right click the wanted element or make a double click on it. Drag and Drop is not supported.
 A new popup window will appeare which needs to be clicked. With this the node will be added to the access view and a subscription is created if non exists already.
 
-![Add AAS element](../images/add_aas.png)
+![Add AAS element](../images/add_aas.jpg)
 
 NOTE:
 * A subscription will not run automatically. To start the subscription, the button *Subscription* in the banner menu needs to be pressed.
 
 To remove a element from the access view, you need to right click or double click the element inside the access view and press the button in the new popup window.
 
-![Remove AAS element](../images/remove_aas.png)
+![Remove AAS element](../images/remove_aas.jpg)
 
 ### Activate subscriptions
 
@@ -104,11 +104,11 @@ A subscription can only be activated, if a node/element in either the OPC UA acc
 
 If a subscription is created, with the button "Subscription" in the banner menu, the subscription can be activated.
 
-![Closed Subscription](../images/Subscription_closed.png)
+![Closed Subscription](../images/Subscription_closed.jpg)
 
 You can see that the subscription is active when the value of the subscription button switches to open.
 
-![Open Subscription](../images/Subscription_open.png)
+![Open Subscription](../images/Subscription_open.jpg)
 
 NOTE:
 If you activated the subscription with for example an OPC UA subscription and create later a AAS subscription, you will need to deactivate the subscription and activate it again after adding an AAS element to the access view.
@@ -118,11 +118,11 @@ If you activated the subscription with for example an OPC UA subscription and cr
 To change the communication from REST to WebSockets, the Button "Websocket" needs to be clicked.
 If "Websocket" states: Disconnected the communication done via REST.
 
-![Session inactive](../images/Subscription_closed.png)
+![Session inactive](../images/Subscription_closed.jpg)
 
 If "Websockets" states: SessionActive the communication done via WebSocket
 
-![Session active](../images/session_active.png)
+![Session active](../images/session_active.jpg)
 
 The handling of browsing and adding nodes/elements to the access view works the same.
 
@@ -133,3 +133,5 @@ Since it's a technical PoC there are some limitations / behaviours you will not 
 #### AAS WebSocket - Access View
 
 If you are changing the communication from REST to WebSocket right after the start, and you add an AAS element to the Access View, you will not get the current value of the node. The subscription will still work and the values will be updated.
+
+![AAS limitation](../images/aas_limitation.jpg)
