@@ -23,7 +23,7 @@ For the OPC UA tree, a client connects with a dedicated OPC UA Server and reads 
 
 The communication for reading the data values for AAS or OPC UA ​​is implemented either through REST or WebSockets.  
 
-![Treeview](../images/information_trees.png)
+![Treeview](./images/information_trees.jpg)
 
 
 
