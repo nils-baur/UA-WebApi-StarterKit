@@ -76,8 +76,6 @@ NOTE:
 
 To remove a element from the access view, you need to click the node inside the access view and the element will be deleted.
 
-![Remove OPC UA element](../images/remove_opc.jpg)
-
 ### AAS
 
 The AAS view has a similar handling as the OPC UA view. It is devided into 3 different sections.
