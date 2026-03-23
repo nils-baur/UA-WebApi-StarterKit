@@ -333,6 +333,8 @@ const AASTreeView: React.FC = () => {
             let isOpcUa = false;
 
             try {
+                // The /info endpoint provides the necessary details to determine if the element is OPC UA-backed and to set up the subscription correctly.
+                // Since subscriptions are new for AAS, the conversion from a submodel element to an OPC UA node is done here in this technical PoC, in furture this should be moved to the server side with the /info endpoint returning the OPC UA nodeId directly.
                 const info: SubmodelElementInfoDto = await sendAASRequest(session, "GET", infoUrl);
 
                 isOpcUa = (info.isOpcUa ?? info.IsOpcUa) ?? false;
@@ -341,7 +343,6 @@ const AASTreeView: React.FC = () => {
                 if (typeof nodeId === "string" && nodeId.length > 0) {
                     mySubscriptionContext.mappedNodeIDs.push({ nodeId, itemId: monitoredItemId.current });
                 }
-                console.log(`[AAS] isOpcUa: ${isOpcUa}, nodeId: ${nodeId}`);
 
                 if (mySubscriptionContext.subscriptionID == -1 && isOpcUa) {
                     if (typeof createSubscription === "function") {

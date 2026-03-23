@@ -406,8 +406,6 @@ namespace UaRestGateway.Server.Controllers
                     var submodelId = DecodeBase64Url(matchElem.Groups["submodelId"].Value);
                     var elementPath = matchElem.Groups["elementPath"].Value;
 
-                    Console.WriteLine($"Received request for elementPath: {elementPath}");
-
                     var parentPathShort = elementPath;
                     if (elementPath.Contains('/'))
                     {

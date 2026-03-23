@@ -70,8 +70,6 @@ namespace UaRestGateway.Server.Controllers
             var decodedAasId = _decoderService.Decode("aasIdentifier", aasIdentifier);
             var decodedSubmodelId = _decoderService.Decode("submodelIdentifier", submodelIdentifier);
 
-            _logger.LogDebug("Received request for submodel element info at path {IdShortPath}", idShortPath);
-
             var (element, isOpcUa, nodeId) = await _aasCommunicationService
                 .GetSubmodelElementInfoAsync(decodedAasId, decodedSubmodelId, idShortPath)
                 .ConfigureAwait(false);

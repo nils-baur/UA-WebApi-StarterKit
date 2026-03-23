@@ -92,7 +92,7 @@ A new popup window will appeare which needs to be clicked. With this the node wi
 ![Add AAS element](../images/add_aas.png)
 
 NOTE:
-* A subscription will not run automaticly. To start the subscription, the button *Subscription* in the banner menu needs to be pressed.
+* A subscription will not run automatically. To start the subscription, the button *Subscription* in the banner menu needs to be pressed.
 
 To remove a element from the access view, you need to right click or double click the element inside the access view and press the button in the new popup window.
 
@@ -125,3 +125,11 @@ If "Websockets" states: SessionActive the communication done via WebSocket
 ![Session active](../images/session_active.png)
 
 The handling of browsing and adding nodes/elements to the access view works the same.
+
+### Technical PoC limitations / behaviours 
+
+Since it's a technical PoC there are some limitations / behaviours you will not expect.
+
+#### AAS WebSocket - Access View
+
+If you are changing the communication from REST to WebSocket right after the start, and you add an AAS element to the Access View, you will not get the current value of the node. The subscription will still work and the values will be updated.
